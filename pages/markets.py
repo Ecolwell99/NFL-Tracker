@@ -1,9 +1,9 @@
 """
-Markets tab — the core QC view.
+Markets tab — core QC view.
 
-Layout: rows = markets, columns = drives (one per drive, in game order).
-Each cell shows the expected result with a Match/Mismatch/Pending colour.
-Mirrors the Excel workbook's drive-column structure but live and auto-calculated.
+Layout: two team sections (away, then home). Within each section,
+rows = markets, columns = drives for that team only.
+Pending cells show plain text (no pill). Only Match / Mismatch get color.
 """
 from __future__ import annotations
 import streamlit as st
@@ -11,9 +11,7 @@ from rules.engine import EvaluatedDrive
 from qc.comparator import DriveQC
 from qc.status import QCStatus, QC_STATUS_COLOR, QC_STATUS_TEXT_COLOR
 from utils.colors import resolve_team_colors, pill_text_color
-from components.status_badge import mismatch_count_html
 
-# Markets shown in the grid, in display order
 _UNIVERSAL_MARKETS = [
     "Drive Result Granular",
     "Drive Result Exact",
@@ -49,7 +47,6 @@ def render(
 
     markets = _UNIVERSAL_MARKETS + (_NFL_MARKETS if is_nfl else [])
 
-    # Filter void drives if requested
     display_evs = evaluated
     display_qcs = drive_qcs
     if not show_void:
@@ -65,8 +62,28 @@ def render(
 
     color_map = resolve_team_colors(game_away_abbrev, game_home_abbrev)
 
-    # Build the grid as HTML for density
-    _render_market_grid(markets, display_evs, display_qcs, color_map, color_mode)
+    away_evs = [e for e in display_evs if e.team_abbrev == game_away_abbrev]
+    home_evs = [e for e in display_evs if e.team_abbrev == game_home_abbrev]
+    qc_by_drive = {q.drive_id: q for q in display_qcs}
+
+    for team_abbrev, team_evs in [(game_away_abbrev, away_evs), (game_home_abbrev, home_evs)]:
+        if not team_evs:
+            continue
+        team_color = color_map.get(team_abbrev, "#555555")
+        fg = pill_text_color(team_color)
+        _render_team_header(team_abbrev, team_color, fg)
+        _render_market_grid(markets, team_evs, qc_by_drive, color_mode)
+        st.markdown("")
+
+
+def _render_team_header(abbrev: str, bg: str, fg: str) -> None:
+    st.markdown(
+        f'<div style="background:{bg}; color:{fg}; padding:8px 16px; '
+        f'border-radius:8px; font-size:14px; font-weight:800; '
+        f'letter-spacing:0.06em; margin-bottom:6px; display:inline-block;">'
+        f'{abbrev}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_summary_bar(drive_qcs: list[DriveQC]) -> None:
@@ -88,28 +105,18 @@ def _render_summary_bar(drive_qcs: list[DriveQC]) -> None:
 
 def _render_market_grid(
     markets: list[str],
-    evaluated: list[EvaluatedDrive],
-    drive_qcs: list[DriveQC],
-    color_map: dict[str, str],
+    team_evs: list[EvaluatedDrive],
+    qc_by_drive: dict[str, DriveQC],
     color_mode: bool,
 ) -> None:
-    qc_by_drive = {q.drive_id: q for q in drive_qcs}
-
-    # ── Header row ───────────────────────────────────────────────────
     header_cells = '<th style="' + _th_style() + ' min-width:180px;">Market</th>'
-    for ev in evaluated:
-        team_color = color_map.get(ev.team_abbrev, "#555555")
-        fg = pill_text_color(team_color)
+    for ev in team_evs:
         header_cells += (
-            f'<th style="{_th_style()} min-width:130px; text-align:center;">'
-            f'<div style="background:{team_color}; color:{fg}; padding:2px 8px; '
-            f'border-radius:6px; font-size:11px; font-weight:800; margin-bottom:2px; '
-            f'display:inline-block;">{ev.team_abbrev}</div>'
-            f'<div style="font-size:10px; opacity:0.7;">Drive {ev.team_drive_number}</div>'
+            f'<th style="{_th_style()} min-width:110px; text-align:center;">'
+            f'Drive {ev.team_drive_number}'
             f'</th>'
         )
 
-    # ── Data rows ────────────────────────────────────────────────────
     body_rows = ""
     for i, market in enumerate(markets):
         row_bg = "rgba(128,128,128,0.04)" if i % 2 == 0 else "rgba(128,128,128,0.10)"
@@ -117,7 +124,7 @@ def _render_market_grid(
             f'<td style="{_td_style()} font-weight:600; opacity:0.85; '
             f'font-size:12px;">{market}</td>'
         )
-        for ev in evaluated:
+        for ev in team_evs:
             expected = _get_expected(ev, market)
             qc = qc_by_drive.get(ev.drive_id)
             status = _get_status(qc, market) if qc else QCStatus.PENDING
@@ -144,24 +151,19 @@ def _cell_content(expected: str, status: QCStatus, system: str, color_mode: bool
     if status == QCStatus.NOT_APPLICABLE:
         return '<span style="font-size:11px; opacity:0.3;">N/A</span>'
 
+    if status == QCStatus.PENDING:
+        return f'<span style="font-size:12px;">{expected}</span>'
+
     bg = QC_STATUS_COLOR.get(status, "#888888")
     fg = QC_STATUS_TEXT_COLOR.get(status, "#ffffff")
 
     if status == QCStatus.MISMATCH:
-        # Show expected / system on two lines
         return (
             f'<span style="background:{bg}; color:{fg}; padding:2px 8px; '
             f'border-radius:6px; font-size:11px; font-weight:700; display:inline-block;">'
             f'EXP: {expected}<br>'
             f'<span style="font-weight:400; font-size:10px;">SYS: {system}</span>'
             f'</span>'
-        )
-
-    if status == QCStatus.PENDING:
-        return (
-            f'<span style="background:{bg}; color:{fg}; padding:2px 8px; '
-            f'border-radius:6px; font-size:11px; font-weight:600; '
-            f'display:inline-block;">{expected}</span>'
         )
 
     return (
