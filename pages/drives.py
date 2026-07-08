@@ -140,7 +140,7 @@ def _render_drive_header(
         unsafe_allow_html=True,
     )
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.metric("Result", str(ev.result_exact))
     with c2:
@@ -148,9 +148,6 @@ def _render_drive_header(
     with c3:
         st.metric("Yards", str(drive.yards_gained))
     with c4:
-        start = f"Own {100 - drive.start_yardline}" if drive.start_yardline > 50 else f"Opp {drive.start_yardline}"
-        st.metric("Start", str(start))
-    with c5:
         st.metric("T.O.P.", str(drive.time_of_possession) if drive.time_of_possession else "—")
 
 
