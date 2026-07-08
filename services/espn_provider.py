@@ -306,6 +306,16 @@ class ESPNProvider(FootballDataProvider):
 
         status, clock = _parse_game_status(comp)
 
+        season     = event.get("season") or {}
+        season_type_raw = season.get("type") if isinstance(season, dict) else None
+        season_type_str = (
+            season_type_raw.get("abbreviation", "")
+            if isinstance(season_type_raw, dict)
+            else ""
+        )
+        week_raw = event.get("week") or {}
+        week_num = week_raw.get("number") if isinstance(week_raw, dict) else None
+
         return Game(
             game_id=str(event.get("id", "")),
             league=League.NFL,
@@ -316,9 +326,8 @@ class ESPNProvider(FootballDataProvider):
             score=Score(home=home_score, away=away_score),
             clock=clock,
             venue=comp.get("venue", {}).get("fullName", "") if isinstance(comp.get("venue"), dict) else "",
-            season_type=event.get("season", {}).get("type", {}).get("abbreviation", "")
-                if isinstance(event.get("season"), dict) else "",
-            week=event.get("week", {}).get("number") if isinstance(event.get("week"), dict) else None,
+            season_type=season_type_str,
+            week=week_num,
         )
 
     def _parse_summary_game(self, game_id: str, data: dict) -> Game:
@@ -326,10 +335,14 @@ class ESPNProvider(FootballDataProvider):
         header = data.get("header", {})
         competitions = header.get("competitions", [])
         if competitions:
-            fake_event = {"id": game_id, "competitions": competitions,
-                          "date": header.get("season", {}).get("year", ""),
-                          "season": header.get("season", {}),
-                          "week": header.get("week", {})}
+            header_season = header.get("season") or {}
+            fake_event = {
+                "id": game_id,
+                "competitions": competitions,
+                "date": header_season.get("year", "") if isinstance(header_season, dict) else "",
+                "season": header_season if isinstance(header_season, dict) else {},
+                "week": header.get("week") or {},
+            }
             game = self._parse_event(fake_event)
             if game:
                 return game
