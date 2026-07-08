@@ -91,7 +91,7 @@ def _render_drive_card(
     # Score
     if drive.score_home or drive.score_away:
         score_html = (
-            f'<span style="font-size:15px; font-weight:600; opacity:0.85;">'
+            f'<span style="font-size:12px; font-weight:600; opacity:0.85;">'
             f'<span style="color:{color_map.get(away_abbrev, "#aaa")}; font-weight:800;">{away_abbrev}</span>'
             f' {drive.score_away} &nbsp;–&nbsp; '
             f'<span style="color:{color_map.get(home_abbrev, "#aaa")}; font-weight:800;">{home_abbrev}</span>'
@@ -106,25 +106,24 @@ def _render_drive_card(
         f"""
         <div style="
             border:1px solid rgba(128,128,128,0.2);
-            border-radius:10px;
-            padding:14px 20px;
-            margin-bottom:6px;
+            border-radius:7px;
+            padding:7px 14px;
+            margin-bottom:4px;
             background:var(--secondary-background-color);
         ">
-            <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="
                     background:{team_color}; color:{fg};
-                    padding:5px 18px; border-radius:8px;
-                    font-weight:900; font-size:18px; letter-spacing:0.04em;
+                    padding:2px 10px; border-radius:5px;
+                    font-weight:800; font-size:13px; letter-spacing:0.03em;
                 ">{team_abbrev}</div>
-                <div style="font-size:17px; font-weight:700; opacity:0.9;">
+                <div style="font-size:13px; font-weight:600; opacity:0.9;">
                     Drive {drive.team_drive_number}
                 </div>
-                <div style="
-                    font-size:18px; font-weight:900; color:{result_color};
-                    {'animation: pulse 1.2s infinite;' if drive.is_current else ''}
-                ">{result_text}</div>
-                <div style="font-size:14px; opacity:0.65;">
+                <div style="font-size:13px; font-weight:800; color:{result_color};">
+                    {result_text}
+                </div>
+                <div style="font-size:12px; opacity:0.6;">
                     {drive.play_count} plays &nbsp;·&nbsp; {drive.yards_gained} yds
                 </div>
                 {f'<div style="margin-left:auto;">{score_html}</div>' if score_html else ''}
