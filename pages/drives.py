@@ -8,6 +8,16 @@ from utils.colors import resolve_team_colors, pill_text_color
 from components.tables import render_table
 from components.status_badge import status_badge_html
 
+# Make expander labels larger and bolder
+_EXPANDER_CSS = """
+<style>
+details summary p {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+}
+</style>
+"""
+
 
 def render(
     drives: list[Drive],
@@ -20,6 +30,8 @@ def render(
     if not drives:
         st.info("No drives yet.")
         return
+
+    st.markdown(_EXPANDER_CSS, unsafe_allow_html=True)
 
     color_map = resolve_team_colors(game_away_abbrev, game_home_abbrev)
     ev_by_id = {e.drive_id: e for e in evaluated}
@@ -35,7 +47,6 @@ def render(
                      type="primary" if st.session_state.drives_team_filter == "All" else "secondary"):
             st.session_state.drives_team_filter = "All"
     with col_away:
-        away_color = color_map.get(game_away_abbrev, "#555")
         if st.button(game_away_abbrev, use_container_width=True,
                      type="primary" if st.session_state.drives_team_filter == game_away_abbrev else "secondary"):
             st.session_state.drives_team_filter = game_away_abbrev
@@ -53,95 +64,16 @@ def render(
         key=lambda d: d.sequence,
     )
 
-    # ── Drive cards ──────────────────────────────────────────────────
+    # ── Drive expanders ──────────────────────────────────────────────
     for drive in filtered:
         ev = ev_by_id.get(drive.drive_id)
         qc = qc_by_id.get(drive.drive_id)
-        _render_drive_card(drive, ev, qc, color_map, game_home_abbrev, game_away_abbrev, color_mode)
+        label = _expander_label(drive, ev, game_home_abbrev, game_away_abbrev)
 
-
-def _render_drive_card(
-    drive: Drive,
-    ev: EvaluatedDrive | None,
-    qc: DriveQC | None,
-    color_map: dict,
-    home_abbrev: str,
-    away_abbrev: str,
-    color_mode: bool,
-) -> None:
-    key = f"drive_open_{drive.drive_id}"
-    if key not in st.session_state:
-        st.session_state[key] = False
-
-    team_abbrev = drive.team.abbreviation
-    team_color = color_map.get(team_abbrev, "#555555")
-    fg = pill_text_color(team_color)
-
-    # Result text
-    if drive.is_current:
-        result_text = "● LIVE"
-        result_color = "#ff4444"
-    elif ev:
-        result_text = ev.result_exact
-        result_color = "var(--text-color)"
-    else:
-        result_text = drive.espn_result or "—"
-        result_color = "var(--text-color)"
-
-    # Score
-    if drive.score_home or drive.score_away:
-        score_html = (
-            f'<span style="font-size:12px; font-weight:600; opacity:0.85;">'
-            f'<span style="color:{color_map.get(away_abbrev, "#aaa")}; font-weight:800;">{away_abbrev}</span>'
-            f' {drive.score_away} &nbsp;–&nbsp; '
-            f'<span style="color:{color_map.get(home_abbrev, "#aaa")}; font-weight:800;">{home_abbrev}</span>'
-            f' {drive.score_home}</span>'
-        )
-    else:
-        score_html = ""
-
-    chevron = "▲" if st.session_state[key] else "▼"
-
-    st.markdown(
-        f"""
-        <div style="
-            border:1px solid rgba(128,128,128,0.2);
-            border-radius:7px;
-            padding:7px 14px;
-            margin-bottom:4px;
-            background:var(--secondary-background-color);
-        ">
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <div style="
-                    background:{team_color}; color:{fg};
-                    padding:2px 10px; border-radius:5px;
-                    font-weight:800; font-size:13px; letter-spacing:0.03em;
-                ">{team_abbrev}</div>
-                <div style="font-size:13px; font-weight:600; opacity:0.9;">
-                    Drive {drive.team_drive_number}
-                </div>
-                <div style="font-size:13px; font-weight:800; color:{result_color};">
-                    {result_text}
-                </div>
-                <div style="font-size:12px; opacity:0.6;">
-                    {drive.play_count} plays &nbsp;·&nbsp; {drive.yards_gained} yds
-                </div>
-                {f'<div style="margin-left:auto;">{score_html}</div>' if score_html else ''}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    if st.button(f"{chevron} {'Hide' if st.session_state[key] else 'Show'} detail",
-                 key=f"btn_{drive.drive_id}",
-                 use_container_width=False):
-        st.session_state[key] = not st.session_state[key]
-        st.rerun()
-
-    if st.session_state[key]:
-        with st.container():
+        with st.expander(label, expanded=False):
             if ev:
+                _render_drive_header(drive, ev, qc, color_map, color_mode)
+                st.divider()
                 _render_market_detail(ev, qc, color_mode)
                 st.divider()
                 _render_play_log(drive, color_mode)
@@ -150,7 +82,76 @@ def _render_drive_card(
                     _render_warnings(ev.warnings)
             else:
                 st.warning("Drive evaluation not available yet.")
-        st.markdown("")
+
+
+def _expander_label(
+    drive: Drive,
+    ev: EvaluatedDrive | None,
+    home_abbrev: str,
+    away_abbrev: str,
+) -> str:
+    team = drive.team.abbreviation
+
+    if drive.is_current:
+        result_part = "● LIVE"
+    elif ev:
+        result_part = ev.result_exact
+    else:
+        result_part = drive.espn_result or "—"
+
+    parts = [f"{team}  Drive {drive.team_drive_number}", result_part,
+             f"{drive.play_count} plays", f"{drive.yards_gained} yds"]
+
+    if drive.score_home or drive.score_away:
+        parts.append(f"{away_abbrev} {drive.score_away} – {home_abbrev} {drive.score_home}")
+
+    return "  ·  ".join(parts)
+
+
+def _render_drive_header(
+    drive: Drive,
+    ev: EvaluatedDrive,
+    qc: DriveQC | None,
+    color_map: dict,
+    color_mode: bool,
+) -> None:
+    team_color = color_map.get(drive.team.abbreviation, "#555555")
+    fg = pill_text_color(team_color)
+    overall = qc.overall_status if qc else QCStatus.PENDING
+
+    live_badge = ""
+    if drive.is_current:
+        live_badge = (
+            '<span style="background:#cc0000; color:#fff; padding:2px 8px; '
+            'border-radius:5px; font-size:12px; font-weight:700; margin-left:8px;">● LIVE</span>'
+        )
+
+    st.markdown(
+        f"""
+        <div style="display:flex; align-items:center; gap:14px; padding:10px 0;">
+            <div style="background:{team_color}; color:{fg}; padding:3px 14px;
+                        border-radius:7px; font-weight:800; font-size:18px;">
+                {drive.team.abbreviation}
+            </div>
+            <div style="font-size:18px; font-weight:700;">{drive.label}{live_badge}</div>
+            <div style="margin-left:auto;">{status_badge_html(overall)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    with c1:
+        st.metric("Result", str(ev.result_exact))
+    with c2:
+        st.metric("Plays", str(drive.play_count))
+    with c3:
+        st.metric("Yards", str(drive.yards_gained))
+    with c4:
+        start = f"Own {100 - drive.start_yardline}" if drive.start_yardline > 50 else f"Opp {drive.start_yardline}"
+        st.metric("Start", str(start))
+    with c5:
+        st.metric("T.O.P.", str(drive.time_of_possession) if drive.time_of_possession else "—")
 
 
 def _render_market_detail(ev: EvaluatedDrive, qc: DriveQC | None, color_mode: bool) -> None:
