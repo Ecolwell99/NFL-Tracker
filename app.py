@@ -19,7 +19,6 @@ from utils.colors import resolve_team_colors
 import pages.overview        as pg_overview
 import pages.drives          as pg_drives
 import pages.play_by_play    as pg_pbp
-import pages.discrepancies   as pg_disc
 import pages.stat_corrections as pg_corrections
 import pages.settings        as pg_settings
 
@@ -208,14 +207,12 @@ except Exception as e:
 warning_box(st.session_state.warning_message, st.session_state.warning_type)
 
 # ── Tab navigation ───────────────────────────────────────────────────
-mismatch_total  = sum(q.mismatch_count for q in drive_qcs)
 correction_total = len(st.session_state.stat_corrections)
 
 tab_labels = [
     "Overview",
     "Drives",
     "Play-by-Play",
-    f"Discrepancies {'🔴' if mismatch_total else '✅'} ({mismatch_total})",
     f"Corrections {'🔴' if correction_total else '✅'} ({correction_total})",
     "Settings",
 ]
@@ -243,13 +240,10 @@ with tabs[2]:
     )
 
 with tabs[3]:
-    pg_disc.render(drive_qcs, color_mode=st.session_state.color_mode)
-
-with tabs[4]:
     pg_corrections.render(
         st.session_state.stat_corrections,
         color_mode=st.session_state.color_mode,
     )
 
-with tabs[5]:
+with tabs[4]:
     pg_settings.render()
