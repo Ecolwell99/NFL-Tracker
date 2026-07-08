@@ -54,6 +54,9 @@ class Drive:
     start_yardline: int = 0
     end_yardline: int = 0
 
+    # Raw yard line for display (1–50 own side, 1–50 opp side + team possession context)
+    start_yardline_raw: int = 0
+
     yards_gained: int = 0
     time_of_possession: str = ""
     play_count: int = 0

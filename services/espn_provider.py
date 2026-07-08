@@ -223,12 +223,20 @@ def _parse_drive(raw: dict, sequence: int, team_map: dict[str, Team], is_current
     start_raw = raw.get("start", {})
     end_raw = raw.get("end", {})
 
-    # Scores at the end of the drive — ESPN nests them under end.homeScore / end.awayScore
+    # Scores at the end of the drive
     score_home = 0
     score_away = 0
     if isinstance(end_raw, dict):
         score_home = int(end_raw.get("homeScore", 0) or 0)
         score_away = int(end_raw.get("awayScore", 0) or 0)
+
+    # T.O.P. — ESPN returns either a plain string or {"displayValue": "4:30"}
+    top_raw = raw.get("timeElapsed", "")
+    if isinstance(top_raw, dict):
+        top_raw = top_raw.get("displayValue", "")
+
+    # yardLine is the standard field-position number (e.g. 25); yardsToEndzone is for rules engine
+    start_yardline_raw = start_raw.get("yardLine", 0) if isinstance(start_raw, dict) else 0
 
     return Drive(
         drive_id=str(raw.get("id", f"drive_{sequence}")),
@@ -239,8 +247,9 @@ def _parse_drive(raw: dict, sequence: int, team_map: dict[str, Team], is_current
         plays=plays,
         start_yardline=start_raw.get("yardsToEndzone", 0) if isinstance(start_raw, dict) else 0,
         end_yardline=end_raw.get("yardsToEndzone", 0) if isinstance(end_raw, dict) else 0,
+        start_yardline_raw=start_yardline_raw,
         yards_gained=raw.get("yards", 0) or 0,
-        time_of_possession=raw.get("timeElapsed", ""),
+        time_of_possession=top_raw,
         play_count=raw.get("offensivePlays", len(plays)),
         description=raw.get("description", ""),
         score_home=score_home,
