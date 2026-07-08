@@ -156,38 +156,27 @@ def _render_drive_header(
 
 def _render_market_detail(ev: EvaluatedDrive, qc: DriveQC | None, color_mode: bool) -> None:
     st.markdown("**Markets**")
-    rows = []
-    for result in (qc.results if qc else []):
-        rows.append({
-            "Market":   result.market,
-            "Expected": result.expected,
-            "System":   result.system or "—",
-            "Status":   result.status.value,
-        })
-    if rows:
-        render_table(rows, color_mode)
-    else:
-        _render_expected_only(ev)
+    _render_expected_only(ev)
 
 
 def _render_expected_only(ev: EvaluatedDrive) -> None:
     rows = [
-        {"Market": "Drive Result Granular",     "Expected": ev.result_granular},
-        {"Market": "Drive Result Exact",        "Expected": ev.result_exact},
-        {"Market": "Drive Result Grouped",      "Expected": ev.result_grouped},
-        {"Market": "Drive Crosses 50",          "Expected": ev.bool_display(ev.cross_50)},
-        {"Market": "Drive Crosses Opposing 35", "Expected": ev.bool_display(ev.opp_35)},
-        {"Market": "Drive Crosses Opposing 20", "Expected": ev.bool_display(ev.opp_20)},
-        {"Market": "Sack This Drive",           "Expected": ev.bool_display(ev.sack)},
-        {"Market": "Punt Fair Catch",           "Expected": ev.bool_display(ev.fair_catch)},
-        {"Market": "TD Scorer",                 "Expected": ev.td_scorer or "N/A"},
+        {"Market": "Drive Result Granular",     "Result": ev.result_granular},
+        {"Market": "Drive Result Exact",        "Result": ev.result_exact},
+        {"Market": "Drive Result Grouped",      "Result": ev.result_grouped},
+        {"Market": "Drive Crosses 50",          "Result": ev.bool_display(ev.cross_50)},
+        {"Market": "Drive Crosses Opposing 35", "Result": ev.bool_display(ev.opp_35)},
+        {"Market": "Drive Crosses Opposing 20", "Result": ev.bool_display(ev.opp_20)},
+        {"Market": "Sack This Drive",           "Result": ev.bool_display(ev.sack)},
+        {"Market": "Punt Fair Catch",           "Result": ev.bool_display(ev.fair_catch)},
+        {"Market": "TD Scorer",                 "Result": ev.td_scorer or "N/A"},
     ]
     if ev.is_nfl:
         rows += [
-            {"Market": "20+ Yard Passing Play",  "Expected": ev.bool_display(ev.passing_20_plus)},
-            {"Market": "10+ Yard Rushing Play",  "Expected": ev.bool_display(ev.rushing_10_plus)},
-            {"Market": "20+ Yard Play",          "Expected": ev.bool_display(ev.play_20_plus)},
-            {"Market": "4th Down Conversion",    "Expected": ev.bool_display(ev.fourth_down_conversion)},
+            {"Market": "20+ Yard Passing Play",  "Result": ev.bool_display(ev.passing_20_plus)},
+            {"Market": "10+ Yard Rushing Play",  "Result": ev.bool_display(ev.rushing_10_plus)},
+            {"Market": "20+ Yard Play",          "Result": ev.bool_display(ev.play_20_plus)},
+            {"Market": "4th Down Conversion",    "Result": ev.bool_display(ev.fourth_down_conversion)},
         ]
     render_table(rows, color_mode=False)
 
