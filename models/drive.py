@@ -54,8 +54,9 @@ class Drive:
     start_yardline: int = 0
     end_yardline: int = 0
 
-    # Raw yard line for display (1–50 own side, 1–50 opp side + team possession context)
+    # Raw yard line number and ESPN-formatted text for display (e.g. "CAR 35")
     start_yardline_raw: int = 0
+    start_text: str = ""
 
     yards_gained: int = 0
     time_of_possession: str = ""

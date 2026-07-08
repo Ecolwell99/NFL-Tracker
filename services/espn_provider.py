@@ -235,7 +235,8 @@ def _parse_drive(raw: dict, sequence: int, team_map: dict[str, Team], is_current
     if isinstance(top_raw, dict):
         top_raw = top_raw.get("displayValue", "")
 
-    # yardLine is the standard field-position number (e.g. 25); yardsToEndzone is for rules engine
+    # Use ESPN's pre-formatted text (e.g. "CAR 35") for display; fall back to yardLine
+    start_text = start_raw.get("text", "") if isinstance(start_raw, dict) else ""
     start_yardline_raw = start_raw.get("yardLine", 0) if isinstance(start_raw, dict) else 0
 
     return Drive(
@@ -248,6 +249,7 @@ def _parse_drive(raw: dict, sequence: int, team_map: dict[str, Team], is_current
         start_yardline=start_raw.get("yardsToEndzone", 0) if isinstance(start_raw, dict) else 0,
         end_yardline=end_raw.get("yardsToEndzone", 0) if isinstance(end_raw, dict) else 0,
         start_yardline_raw=start_yardline_raw,
+        start_text=start_text,
         yards_gained=raw.get("yards", 0) or 0,
         time_of_possession=top_raw,
         play_count=raw.get("offensivePlays", len(plays)),
