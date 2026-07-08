@@ -75,16 +75,16 @@ def _render_drive_header(
 
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
-        st.metric("Result", ev.result_exact)
+        st.metric("Result", str(ev.result_exact))
     with c2:
-        st.metric("Plays", drive.play_count)
+        st.metric("Plays", str(drive.play_count))
     with c3:
-        st.metric("Yards", drive.yards_gained)
+        st.metric("Yards", str(drive.yards_gained))
     with c4:
         start = f"Own {100 - drive.start_yardline}" if drive.start_yardline > 50 else f"Opp {drive.start_yardline}"
-        st.metric("Start", start)
+        st.metric("Start", str(start))
     with c5:
-        st.metric("T.O.P.", drive.time_of_possession or "—")
+        st.metric("T.O.P.", str(drive.time_of_possession) if drive.time_of_possession else "—")
 
 
 def _render_market_detail(ev: EvaluatedDrive, qc: DriveQC | None, color_mode: bool) -> None:
