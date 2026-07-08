@@ -17,7 +17,6 @@ from utils.time import period_label
 from utils.colors import resolve_team_colors
 
 import pages.overview        as pg_overview
-import pages.markets         as pg_markets
 import pages.drives          as pg_drives
 import pages.play_by_play    as pg_pbp
 import pages.discrepancies   as pg_disc
@@ -214,7 +213,6 @@ correction_total = len(st.session_state.stat_corrections)
 
 tab_labels = [
     "Overview",
-    "Markets",
     "Drives",
     "Play-by-Play",
     f"Discrepancies {'🔴' if mismatch_total else '✅'} ({mismatch_total})",
@@ -228,16 +226,6 @@ with tabs[0]:
     pg_overview.render(game, drives, evaluated)
 
 with tabs[1]:
-    pg_markets.render(
-        evaluated, drive_qcs,
-        game_home_abbrev=game.home_team.abbreviation,
-        game_away_abbrev=game.away_team.abbreviation,
-        is_nfl=True,
-        color_mode=st.session_state.color_mode,
-        show_void=st.session_state.get("show_void_drives", True),
-    )
-
-with tabs[2]:
     pg_drives.render(
         drives, evaluated, drive_qcs,
         game_home_abbrev=game.home_team.abbreviation,
@@ -245,7 +233,7 @@ with tabs[2]:
         color_mode=st.session_state.color_mode,
     )
 
-with tabs[3]:
+with tabs[2]:
     pg_pbp.render(
         drives,
         game_home_abbrev=game.home_team.abbreviation,
@@ -254,14 +242,14 @@ with tabs[3]:
         color_mode=st.session_state.color_mode,
     )
 
-with tabs[4]:
+with tabs[3]:
     pg_disc.render(drive_qcs, color_mode=st.session_state.color_mode)
 
-with tabs[5]:
+with tabs[4]:
     pg_corrections.render(
         st.session_state.stat_corrections,
         color_mode=st.session_state.color_mode,
     )
 
-with tabs[6]:
+with tabs[5]:
     pg_settings.render()

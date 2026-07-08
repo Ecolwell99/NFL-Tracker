@@ -59,6 +59,13 @@ class Drive:
     play_count: int = 0
     description: str = ""       # ESPN raw e.g. "9 plays, 56 yards, 4:30"
 
+    # Score at the end of this drive
+    score_home: int = 0
+    score_away: int = 0
+
+    # True if this is the currently active drive (live game)
+    is_current: bool = False
+
     # ESPN raw result string — used as fallback
     espn_result: str = ""       # e.g. "TD", "PUNT", "INT", "END OF HALF"
 

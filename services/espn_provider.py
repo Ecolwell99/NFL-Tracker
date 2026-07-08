@@ -208,12 +208,11 @@ def _build_drive_result(granular: DriveResultGranular) -> DriveResult:
     )
 
 
-def _parse_drive(raw: dict, sequence: int, team_map: dict[str, Team]) -> Drive:
+def _parse_drive(raw: dict, sequence: int, team_map: dict[str, Team], is_current: bool = False) -> Drive:
     team_raw = raw.get("team", {})
     team_id = str(team_raw.get("id", ""))
     team = team_map.get(team_id) or _parse_team(team_raw)
 
-    # Parse plays
     raw_plays = raw.get("plays", [])
     plays = [_parse_play(p, i) for i, p in enumerate(raw_plays)]
 
@@ -224,12 +223,19 @@ def _parse_drive(raw: dict, sequence: int, team_map: dict[str, Team]) -> Drive:
     start_raw = raw.get("start", {})
     end_raw = raw.get("end", {})
 
+    # Scores at the end of the drive — ESPN nests them under end.homeScore / end.awayScore
+    score_home = 0
+    score_away = 0
+    if isinstance(end_raw, dict):
+        score_home = int(end_raw.get("homeScore", 0) or 0)
+        score_away = int(end_raw.get("awayScore", 0) or 0)
+
     return Drive(
         drive_id=str(raw.get("id", f"drive_{sequence}")),
-        game_id="",                 # filled in by get_drives()
+        game_id="",
         sequence=sequence,
         team=team,
-        team_drive_number=0,        # computed after all drives are collected
+        team_drive_number=0,
         plays=plays,
         start_yardline=start_raw.get("yardsToEndzone", 0) if isinstance(start_raw, dict) else 0,
         end_yardline=end_raw.get("yardsToEndzone", 0) if isinstance(end_raw, dict) else 0,
@@ -237,6 +243,9 @@ def _parse_drive(raw: dict, sequence: int, team_map: dict[str, Team]) -> Drive:
         time_of_possession=raw.get("timeElapsed", ""),
         play_count=raw.get("offensivePlays", len(plays)),
         description=raw.get("description", ""),
+        score_home=score_home,
+        score_away=score_away,
+        is_current=is_current,
         espn_result=espn_result,
         result=result,
     )
@@ -376,10 +385,15 @@ class ESPNProvider(FootballDataProvider):
         current = drives_raw.get("current")
 
         all_raw = list(previous)
+        current_id = None
         if isinstance(current, dict) and current.get("id"):
             all_raw.append(current)
+            current_id = str(current.get("id"))
 
-        drives = [_parse_drive(raw, i + 1, team_map) for i, raw in enumerate(all_raw)]
+        drives = [
+            _parse_drive(raw, i + 1, team_map, is_current=(str(raw.get("id")) == current_id))
+            for i, raw in enumerate(all_raw)
+        ]
         for d in drives:
             d.game_id = game_id
 
