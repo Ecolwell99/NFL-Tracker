@@ -20,7 +20,6 @@ import pages.overview        as pg_overview
 import pages.drives          as pg_drives
 import pages.play_by_play    as pg_pbp
 import pages.stat_corrections as pg_corrections
-import pages.settings        as pg_settings
 
 # ── App config ──────────────────────────────────────────────────────
 st.set_page_config(
@@ -214,7 +213,6 @@ tab_labels = [
     "Drives",
     "Play-by-Play",
     f"Corrections {'🔴' if correction_total else '✅'} ({correction_total})",
-    "Settings",
 ]
 
 tabs = st.tabs(tab_labels)
@@ -244,6 +242,3 @@ with tabs[3]:
         st.session_state.stat_corrections,
         color_mode=st.session_state.color_mode,
     )
-
-with tabs[4]:
-    pg_settings.render()
