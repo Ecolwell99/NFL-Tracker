@@ -152,25 +152,25 @@ def _granular_from_espn(espn_result: str, plays: list[Play]) -> DriveResultGranu
         return _ESPN_RESULT_TO_GRANULAR[result_upper]
 
     # Fuzzy fallback
-    if "touchdown" in result_upper or result_upper.startswith("TD"):
+    if "TOUCHDOWN" in result_upper or result_upper.startswith("TD"):
         for play in reversed(plays):
             if play.play_type == PlayType.PASSING_TD:
                 return DriveResultGranular.PASSING_TD
             if play.play_type == PlayType.RUSHING_TD:
                 return DriveResultGranular.RUSHING_TD
-    if "punt" in result_upper:
+    if "PUNT" in result_upper:
         return DriveResultGranular.PUNT
-    if "field goal" in result_upper and ("miss" in result_upper or "block" in result_upper):
+    if "FIELD GOAL" in result_upper and ("MISS" in result_upper or "BLOCK" in result_upper):
         return DriveResultGranular.FG_MISSED
-    if "field goal" in result_upper:
+    if "FIELD GOAL" in result_upper:
         return DriveResultGranular.FG_MADE
-    if "interception" in result_upper or result_upper == "INT":
+    if "INTERCEPTION" in result_upper:
         return DriveResultGranular.INTERCEPTION
-    if "fumble" in result_upper:
+    if "FUMBLE" in result_upper:
         return DriveResultGranular.FUMBLE
-    if "downs" in result_upper or "safety" in result_upper:
+    if "DOWNS" in result_upper or "SAFETY" in result_upper:
         return DriveResultGranular.TURNOVER_ON_DOWNS_OR_SAFETY
-    if "half" in result_upper or "game" in result_upper or "quarter" in result_upper:
+    if "HALF" in result_upper or "GAME" in result_upper or "QUARTER" in result_upper:
         return DriveResultGranular.END_OF_HALF
 
     return DriveResultGranular.UNKNOWN
