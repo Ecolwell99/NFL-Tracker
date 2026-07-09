@@ -22,7 +22,7 @@ def drive_status_badge_html(is_current: bool) -> str:
         )
     return (
         '<span style="background-color:#2a2a2a; color:#aaa; padding:3px 12px; '
-        'border-radius:12px; font-weight:700; font-size:12px;">Concluded</span>'
+        'border-radius:12px; font-weight:700; font-size:12px;">Finished</span>'
     )
 
 
