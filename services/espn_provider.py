@@ -22,6 +22,7 @@ _ESPN_RESULT_TO_GRANULAR = {
     "INT": DriveResultGranular.INTERCEPTION,
     "INT TD": DriveResultGranular.INTERCEPTION,
     "FUMBLE": DriveResultGranular.FUMBLE,
+    "FUMBLE TD": DriveResultGranular.FUMBLE,
     "DOWNS": DriveResultGranular.TURNOVER_ON_DOWNS_OR_SAFETY,
     "SAFETY": DriveResultGranular.TURNOVER_ON_DOWNS_OR_SAFETY,
     "MISSED FG": DriveResultGranular.FG_MISSED,
