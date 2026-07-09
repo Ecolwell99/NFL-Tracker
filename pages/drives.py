@@ -3,10 +3,9 @@ import streamlit as st
 from models.drive import Drive
 from rules.engine import EvaluatedDrive
 from qc.comparator import DriveQC
-from qc.status import QCStatus
 from utils.colors import resolve_team_colors, pill_text_color
 from components.tables import render_table
-from components.status_badge import status_badge_html
+from components.status_badge import drive_status_badge_html
 
 # Make expander labels larger and bolder
 _EXPANDER_CSS = """
@@ -126,7 +125,6 @@ def _render_drive_header(
 ) -> None:
     team_color = color_map.get(drive.team.abbreviation, "#555555")
     fg = pill_text_color(team_color)
-    overall = qc.overall_status if qc else QCStatus.PENDING
 
     live_badge = ""
     if drive.is_current:
@@ -143,7 +141,7 @@ def _render_drive_header(
                 {drive.team.abbreviation}
             </div>
             <div style="font-size:18px; font-weight:700;">{drive.label}{live_badge}</div>
-            <div style="margin-left:auto;">{status_badge_html(overall)}</div>
+            <div style="margin-left:auto;">{drive_status_badge_html(drive.is_current)}</div>
         </div>
         """,
         unsafe_allow_html=True,

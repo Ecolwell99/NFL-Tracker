@@ -14,6 +14,18 @@ def status_badge_html(status: QCStatus) -> str:
     )
 
 
+def drive_status_badge_html(is_current: bool) -> str:
+    if is_current:
+        return (
+            '<span style="background-color:#cc0000; color:#fff; padding:3px 12px; '
+            'border-radius:12px; font-weight:700; font-size:12px;">● LIVE</span>'
+        )
+    return (
+        '<span style="background-color:#2a2a2a; color:#aaa; padding:3px 12px; '
+        'border-radius:12px; font-weight:700; font-size:12px;">Concluded</span>'
+    )
+
+
 def mismatch_count_html(count: int) -> str:
     if count == 0:
         return (
