@@ -56,11 +56,11 @@ def render(
                      type="primary" if st.session_state.drives_team_filter == game_home_abbrev else "secondary"):
             st.session_state.drives_team_filter = game_home_abbrev
     with col_sort:
-        if st.button(
+        st.button(
             "↕ Newest First" if not st.session_state.drives_newest_first else "↕ Oldest First",
             use_container_width=True,
-        ):
-            st.session_state.drives_newest_first = not st.session_state.drives_newest_first
+            on_click=lambda: st.session_state.update(drives_newest_first=not st.session_state.drives_newest_first),
+        )
 
     st.markdown("")
 
