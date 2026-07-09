@@ -20,6 +20,7 @@ _ESPN_RESULT_TO_GRANULAR = {
     "FG": DriveResultGranular.FG_MADE,
     "PUNT": DriveResultGranular.PUNT,
     "INT": DriveResultGranular.INTERCEPTION,
+    "INT TD": DriveResultGranular.INTERCEPTION,
     "FUMBLE": DriveResultGranular.FUMBLE,
     "DOWNS": DriveResultGranular.TURNOVER_ON_DOWNS_OR_SAFETY,
     "SAFETY": DriveResultGranular.TURNOVER_ON_DOWNS_OR_SAFETY,
@@ -164,7 +165,7 @@ def _granular_from_espn(espn_result: str, plays: list[Play]) -> DriveResultGranu
         return DriveResultGranular.FG_MISSED
     if "FIELD GOAL" in result_upper:
         return DriveResultGranular.FG_MADE
-    if "INTERCEPTION" in result_upper:
+    if "INTERCEPTION" in result_upper or result_upper.startswith("INT"):
         return DriveResultGranular.INTERCEPTION
     if "FUMBLE" in result_upper:
         return DriveResultGranular.FUMBLE
