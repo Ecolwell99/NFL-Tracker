@@ -140,21 +140,6 @@ with st.sidebar:
             st.session_state.tracking = True
             st.session_state.drive_snapshots = {}
 
-    # Display prefs
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if st.button(
-            "🎨 Color ON" if st.session_state.color_mode else "🎨 Color OFF",
-            use_container_width=True,
-        ):
-            st.session_state.color_mode = not st.session_state.color_mode
-    with col_b:
-        if st.button(
-            "↕ New→Old" if st.session_state.filter_recent else "↕ Old→New",
-            use_container_width=True,
-        ):
-            st.session_state.filter_recent = not st.session_state.filter_recent
-
     st.divider()
 
     # Connection status

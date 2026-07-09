@@ -37,11 +37,13 @@ def render(
     ev_by_id = {e.drive_id: e for e in evaluated}
     qc_by_id = {q.drive_id: q for q in drive_qcs}
 
-    # ── Team filter ──────────────────────────────────────────────────
+    # ── Team filter + sort ───────────────────────────────────────────
     if "drives_team_filter" not in st.session_state:
         st.session_state.drives_team_filter = "All"
+    if "drives_newest_first" not in st.session_state:
+        st.session_state.drives_newest_first = False
 
-    col_all, col_away, col_home, _ = st.columns([1, 1, 1, 5])
+    col_all, col_away, col_home, _, col_sort = st.columns([1, 1, 1, 3, 1.5])
     with col_all:
         if st.button("All", use_container_width=True,
                      type="primary" if st.session_state.drives_team_filter == "All" else "secondary"):
@@ -54,6 +56,12 @@ def render(
         if st.button(game_home_abbrev, use_container_width=True,
                      type="primary" if st.session_state.drives_team_filter == game_home_abbrev else "secondary"):
             st.session_state.drives_team_filter = game_home_abbrev
+    with col_sort:
+        if st.button(
+            "↕ Newest First" if not st.session_state.drives_newest_first else "↕ Oldest First",
+            use_container_width=True,
+        ):
+            st.session_state.drives_newest_first = not st.session_state.drives_newest_first
 
     st.markdown("")
 
@@ -62,6 +70,7 @@ def render(
     filtered = sorted(
         [d for d in drives if active_filter == "All" or d.team.abbreviation == active_filter],
         key=lambda d: d.sequence,
+        reverse=st.session_state.drives_newest_first,
     )
 
     # ── Drive expanders ──────────────────────────────────────────────
