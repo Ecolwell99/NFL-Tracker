@@ -79,7 +79,7 @@ init_state()
 
 # ── Sidebar ──────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## NFL Markets QC")
+    st.markdown("## NFL Markets")
     st.divider()
 
     # Game selector
