@@ -8,7 +8,7 @@ from streamlit_autorefresh import st_autorefresh
 from state.session import init_state, reset_game_state
 from services.espn_provider import ESPNProvider, RateLimitedError
 from services.cache import cached_get_games, cached_get_drives, cached_get_game
-from models.game import League
+from models.game import League, GameStatus
 from rules.engine import evaluate_all_drives
 from qc.comparator import compare_all_drives
 from qc.corrections import snapshot_all_drives, diff_drives, build_drive_label_map, merge_corrections
@@ -21,7 +21,6 @@ import pages.play_by_play    as pg_pbp
 import pages.stat_corrections as pg_corrections
 
 def _render_scoreboard(game) -> None:
-    from models.game import GameStatus
     color_map = resolve_team_colors(game.home_team.abbreviation, game.away_team.abbreviation)
     home = game.home_team
     away = game.away_team
