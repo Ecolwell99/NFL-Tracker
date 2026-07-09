@@ -30,15 +30,22 @@ def td_scorer(drive: Drive) -> Player | None:
 
     for play in reversed(drive.plays):
         if play.play_type == PlayType.PASSING_TD:
-            # athletes[1] is the receiver (scorer), athletes[0] is the passer
             if len(play.athletes) >= 2:
                 return play.athletes[1]
             if len(play.athletes) == 1:
                 return play.athletes[0]
+            # Fallback: parse receiver from description e.g. "S.Darnold pass ... to A.Barner for"
+            name = _parse_receiver_from_text(play.description)
+            if name:
+                return Player(player_id="", display_name=name)
 
         if play.play_type == PlayType.RUSHING_TD:
             if play.athletes:
                 return play.athletes[0]
+            # Fallback: parse rusher from description e.g. "A.Jones up the middle for ... TOUCHDOWN"
+            name = _parse_rusher_from_text(play.description)
+            if name:
+                return Player(player_id="", display_name=name)
 
     return None
 
@@ -54,8 +61,12 @@ def td_passer(drive: Drive) -> Player | None:
         return None
 
     for play in reversed(drive.plays):
-        if play.play_type == PlayType.PASSING_TD and play.athletes:
-            return play.athletes[0]
+        if play.play_type == PlayType.PASSING_TD:
+            if play.athletes:
+                return play.athletes[0]
+            name = _parse_passer_from_text(play.description)
+            if name:
+                return Player(player_id="", display_name=name)
 
     return None
 
@@ -115,3 +126,26 @@ def _abbreviated_name(full_name: str) -> str:
     if len(parts) >= 2:
         return f"{parts[0][0]}. {' '.join(parts[1:])}"
     return full_name
+
+
+import re as _re
+
+def _parse_passer_from_text(text: str) -> str:
+    # "S.Darnold pass ..." → "S.Darnold"
+    m = _re.match(r"([A-Z]\.\S+)\s+pass", text)
+    return m.group(1) if m else ""
+
+
+def _parse_receiver_from_text(text: str) -> str:
+    # "... pass ... to A.Barner for" or "... pass ... intended for A.Barner"
+    m = _re.search(r"pass\s+\S+(?:\s+\S+)?\s+to\s+([A-Z]\.\S+)", text)
+    if m:
+        return m.group(1)
+    m = _re.search(r"intended\s+for\s+([A-Z]\.\S+)", text)
+    return m.group(1) if m else ""
+
+
+def _parse_rusher_from_text(text: str) -> str:
+    # "A.Jones up the middle ..." → "A.Jones"
+    m = _re.match(r"([A-Z]\.\S+)\s+", text)
+    return m.group(1) if m else ""
