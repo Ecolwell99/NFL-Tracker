@@ -14,12 +14,51 @@ from qc.comparator import compare_all_drives
 from qc.corrections import snapshot_all_drives, diff_drives, build_drive_label_map, merge_corrections
 from components.warning_box import warning_box
 from utils.time import period_label
-from utils.colors import resolve_team_colors
+from utils.colors import resolve_team_colors, pill_text_color
 
-import pages.overview        as pg_overview
 import pages.drives          as pg_drives
 import pages.play_by_play    as pg_pbp
 import pages.stat_corrections as pg_corrections
+
+def _render_scoreboard(game) -> None:
+    from models.game import GameStatus
+    color_map = resolve_team_colors(game.home_team.abbreviation, game.away_team.abbreviation)
+    home = game.home_team
+    away = game.away_team
+    home_color = color_map.get(home.abbreviation, "#888888")
+    away_color = color_map.get(away.abbreviation, "#888888")
+    clock = game.clock
+    period_str = period_label(clock.period)
+    if clock.is_final:
+        period_str = "FINAL"
+    elif clock.is_intermission:
+        period_str = f"{period_str} — HALFTIME"
+    st.markdown(
+        f"""
+        <div style="display:flex; justify-content:center; align-items:center;
+                    gap:40px; padding:12px 0 8px 0;">
+            <div style="text-align:center;">
+                <div style="background:{away_color}; color:{pill_text_color(away_color)};
+                            padding:4px 16px; border-radius:8px; font-weight:800;
+                            font-size:22px; letter-spacing:0.05em;">{away.abbreviation}</div>
+                <div style="font-size:42px; font-weight:900; line-height:1.1;">{game.score.away}</div>
+            </div>
+            <div style="text-align:center; opacity:0.5; font-size:18px; font-weight:700;">
+                @
+                <div style="font-size:13px; margin-top:6px; font-weight:600;">{period_str}</div>
+                <div style="font-size:12px; margin-top:2px;">{clock.clock}</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="background:{home_color}; color:{pill_text_color(home_color)};
+                            padding:4px 16px; border-radius:8px; font-weight:800;
+                            font-size:22px; letter-spacing:0.05em;">{home.abbreviation}</div>
+                <div style="font-size:42px; font-weight:900; line-height:1.1;">{game.score.home}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 # ── App config ──────────────────────────────────────────────────────
 st.set_page_config(
@@ -202,6 +241,9 @@ except Exception as e:
     warning_box(f"⚠ Refresh error: {e}", "alert")
     st.stop()
 
+# ── Scoreboard ───────────────────────────────────────────────────────
+_render_scoreboard(game)
+
 # ── Status bar ───────────────────────────────────────────────────────
 warning_box(st.session_state.warning_message, st.session_state.warning_type)
 
@@ -209,7 +251,6 @@ warning_box(st.session_state.warning_message, st.session_state.warning_type)
 correction_total = len(st.session_state.stat_corrections)
 
 tab_labels = [
-    "Overview",
     "Drives",
     "Play-by-Play",
     f"Corrections {'🔴' if correction_total else '✅'} ({correction_total})",
@@ -218,9 +259,6 @@ tab_labels = [
 tabs = st.tabs(tab_labels)
 
 with tabs[0]:
-    pg_overview.render(game, drives, evaluated)
-
-with tabs[1]:
     pg_drives.render(
         drives, evaluated, drive_qcs,
         game_home_abbrev=game.home_team.abbreviation,
@@ -228,7 +266,7 @@ with tabs[1]:
         color_mode=st.session_state.color_mode,
     )
 
-with tabs[2]:
+with tabs[1]:
     pg_pbp.render(
         drives,
         game_home_abbrev=game.home_team.abbreviation,
@@ -237,7 +275,7 @@ with tabs[2]:
         color_mode=st.session_state.color_mode,
     )
 
-with tabs[3]:
+with tabs[2]:
     pg_corrections.render(
         st.session_state.stat_corrections,
         color_mode=st.session_state.color_mode,
