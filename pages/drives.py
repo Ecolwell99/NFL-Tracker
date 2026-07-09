@@ -172,7 +172,6 @@ def _render_expected_only(ev: EvaluatedDrive) -> None:
         {"Market": "Drive Crosses Opposing 35", "Result": ev.bool_display(ev.opp_35)},
         {"Market": "Drive Crosses Opposing 20", "Result": ev.bool_display(ev.opp_20)},
         {"Market": "Sack This Drive",           "Result": ev.bool_display(ev.sack)},
-        {"Market": "Punt Fair Catch",           "Result": ev.bool_display(ev.fair_catch)},
         {"Market": "TD Scorer",                 "Result": ev.td_scorer or "N/A"},
     ]
     if ev.is_nfl:
@@ -182,6 +181,9 @@ def _render_expected_only(ev: EvaluatedDrive) -> None:
             {"Market": "20+ Yard Play",          "Result": ev.bool_display(ev.play_20_plus)},
             {"Market": "4th Down Conversion",    "Result": ev.bool_display(ev.fourth_down_conversion)},
         ]
+    rows += [
+        {"Market": "Punt Fair Catch",           "Result": ev.bool_display(ev.fair_catch)},
+    ]
     render_table(rows, color_mode=False)
 
 
