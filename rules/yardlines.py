@@ -7,9 +7,9 @@ All positions use yardsToEndzone convention (ESPN native):
   100 = own endzone (starting position deep in own territory)
 
 Crossing thresholds:
-  Midfield      = yardsToEndzone <= 50  (crossed into opponent half)
-  Opponent 35   = yardsToEndzone <= 35
-  Opponent 20   = yardsToEndzone <= 20  (red zone entry)
+  Midfield      = yardsToEndzone < 50   (must reach opp 49 or closer)
+  Opponent 35   = yardsToEndzone < 35   (must reach opp 34 or closer)
+  Opponent 20   = yardsToEndzone < 20   (must reach opp 19 or closer)
 
 Invariant chain from workbook (hard rules):
   TD            → Cross50=Yes, Opp35=Yes, Opp20=Yes  (always)
@@ -57,7 +57,7 @@ def crossed_midfield(drive: Drive) -> bool:
     """
     if drive.is_touchdown:
         return True
-    return _min_yards_to_endzone(drive) <= _MIDFIELD_THRESHOLD
+    return _min_yards_to_endzone(drive) < _MIDFIELD_THRESHOLD
 
 
 def crossed_opp_35(drive: Drive) -> bool:
@@ -68,7 +68,7 @@ def crossed_opp_35(drive: Drive) -> bool:
     """
     if drive.is_touchdown:
         return True
-    return _min_yards_to_endzone(drive) <= _OPP_35_THRESHOLD
+    return _min_yards_to_endzone(drive) < _OPP_35_THRESHOLD
 
 
 def crossed_opp_20(drive: Drive) -> bool:
@@ -84,7 +84,7 @@ def crossed_opp_20(drive: Drive) -> bool:
         # FG attempts are typically from inside the 40; a made FG from inside 20 is rare
         # but possible. Check actual field position.
         pass
-    return _min_yards_to_endzone(drive) <= _OPP_20_THRESHOLD
+    return _min_yards_to_endzone(drive) < _OPP_20_THRESHOLD
 
 
 def validate_yardline_chain(
