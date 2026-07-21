@@ -72,17 +72,20 @@ def validate_drive(values: DriveMarketValues) -> list[str]:
         if values.opp_20 is True:
             warnings.append("Cross50=No implies Opp20 must be No")
 
-    # Rule 5: Non-punt drives must have Fair Catch = N/A
-    if values.granular != DriveResultGranular.PUNT and values.fair_catch is not None:
+    # Rule 5 (NFL only — Punt Fair Catch is not a CFB market):
+    # Non-punt drives must have Fair Catch = N/A
+    if values.is_nfl and values.granular != DriveResultGranular.PUNT and values.fair_catch is not None:
         warnings.append("Non-punt drive: Fair Catch should be N/A")
 
-    # Rule 6: Non-TD drives must have TD Scorer = N/A
-    if values.granular not in (DriveResultGranular.RUSHING_TD, DriveResultGranular.PASSING_TD):
+    # Rule 6 (NFL only — TD Scorer is not a CFB market):
+    # Non-TD drives must have TD Scorer = N/A
+    if values.is_nfl and values.granular not in (DriveResultGranular.RUSHING_TD, DriveResultGranular.PASSING_TD):
         if values.td_scorer is not None and values.td_scorer != "N/A":
             warnings.append("Non-TD drive: TD Scorer should be N/A")
 
-    # Rule 7: TD drives must have TD Scorer populated
-    if values.granular in (DriveResultGranular.RUSHING_TD, DriveResultGranular.PASSING_TD):
+    # Rule 7 (NFL only — TD Scorer is not a CFB market):
+    # TD drives must have TD Scorer populated
+    if values.is_nfl and values.granular in (DriveResultGranular.RUSHING_TD, DriveResultGranular.PASSING_TD):
         if values.td_scorer == "" or values.td_scorer is None:
             warnings.append("TD drive: TD Scorer is missing")
 
@@ -105,15 +108,16 @@ def validate_completeness(values: DriveMarketValues) -> list[str]:
         "Opp 35": values.opp_35,
         "Opp 20": values.opp_20,
         "Sack": values.sack,
-        "Fair Catch": values.fair_catch,
-        "TD Scorer": values.td_scorer,
     }
     for name, val in required_universal.items():
         if val is None:
             missing.append(name)
 
     if values.is_nfl:
+        # Fair Catch and TD Scorer are NFL-only markets.
         required_nfl = {
+            "Fair Catch": values.fair_catch,
+            "TD Scorer": values.td_scorer,
             "20+ Passing Play": values.passing_20_plus,
             "10+ Rushing Play": values.rushing_10_plus,
             "20+ Play": values.play_20_plus,
