@@ -209,18 +209,18 @@ def _render_expected_only(ev: EvaluatedDrive) -> None:
         {"Market": "Drive Crosses Opposing 35", "Result": ev.bool_display(ev.opp_35)},
         {"Market": "Drive Crosses Opposing 20", "Result": ev.bool_display(ev.opp_20)},
         {"Market": "Sack This Drive",           "Result": ev.bool_display(ev.sack)},
-        {"Market": "TD Scorer",                 "Result": ev.td_scorer or "N/A"},
     ]
+    # NFL-only markets — TD Scorer, the four play props, and Punt Fair Catch
+    # are not offered on CFB.
     if ev.is_nfl:
         rows += [
+            {"Market": "TD Scorer",              "Result": ev.td_scorer or "N/A"},
             {"Market": "20+ Yard Passing Play",  "Result": ev.bool_display(ev.passing_20_plus)},
             {"Market": "10+ Yard Rushing Play",  "Result": ev.bool_display(ev.rushing_10_plus)},
             {"Market": "20+ Yard Play",          "Result": ev.bool_display(ev.play_20_plus)},
             {"Market": "4th Down Conversion",    "Result": ev.bool_display(ev.fourth_down_conversion)},
+            {"Market": "Punt Fair Catch",        "Result": ev.bool_display(ev.fair_catch)},
         ]
-    rows += [
-        {"Market": "Punt Fair Catch",           "Result": ev.bool_display(ev.fair_catch)},
-    ]
     render_table(rows, color_mode=False)
 
 
