@@ -3,7 +3,7 @@ import streamlit as st
 from models.drive import Drive, SpecialTeamsScore
 from rules.engine import EvaluatedDrive
 from qc.comparator import DriveQC
-from utils.colors import resolve_team_colors, pill_text_color
+from utils.colors import resolve_team_colors, pill_text_color, team_fallback_colors
 from components.tables import render_table
 from components.status_badge import drive_status_badge_html
 from rules.scoring import pass_catchers_table
@@ -35,7 +35,10 @@ def render(
 
     st.markdown(_EXPANDER_CSS, unsafe_allow_html=True)
 
-    color_map = resolve_team_colors(game_away_abbrev, game_home_abbrev)
+    color_map = resolve_team_colors(
+        game_away_abbrev, game_home_abbrev,
+        fallback=team_fallback_colors(*{d.team.abbreviation: d.team for d in drives}.values()),
+    )
     ev_by_id = {e.drive_id: e for e in evaluated}
     qc_by_id = {q.drive_id: q for q in drive_qcs}
 

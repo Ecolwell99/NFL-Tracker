@@ -1,7 +1,7 @@
 from __future__ import annotations
 import streamlit as st
 from models.drive import Drive
-from utils.colors import resolve_team_colors, pill_text_color
+from utils.colors import resolve_team_colors, pill_text_color, team_fallback_colors
 from components.tables import render_table
 
 
@@ -16,7 +16,10 @@ def render(
         st.info("No play data yet.")
         return
 
-    color_map = resolve_team_colors(game_away_abbrev, game_home_abbrev)
+    color_map = resolve_team_colors(
+        game_away_abbrev, game_home_abbrev,
+        fallback=team_fallback_colors(*{d.team.abbreviation: d.team for d in drives}.values()),
+    )
 
     # Filter controls
     all_teams = sorted({d.team.abbreviation for d in drives})

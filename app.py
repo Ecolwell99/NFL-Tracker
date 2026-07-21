@@ -14,14 +14,17 @@ from qc.comparator import compare_all_drives
 from qc.corrections import snapshot_all_drives, diff_drives, build_drive_label_map, merge_corrections
 from components.warning_box import warning_box
 from utils.time import period_label
-from utils.colors import resolve_team_colors, pill_text_color
+from utils.colors import resolve_team_colors, pill_text_color, team_fallback_colors
 
 import pages.drives          as pg_drives
 import pages.play_by_play    as pg_pbp
 import pages.stat_corrections as pg_corrections
 
 def _render_scoreboard(game) -> None:
-    color_map = resolve_team_colors(game.home_team.abbreviation, game.away_team.abbreviation)
+    color_map = resolve_team_colors(
+        game.home_team.abbreviation, game.away_team.abbreviation,
+        fallback=team_fallback_colors(game.home_team, game.away_team),
+    )
     home = game.home_team
     away = game.away_team
     home_color = color_map.get(home.abbreviation, "#888888")

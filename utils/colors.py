@@ -43,12 +43,63 @@ def pill_text_color(bg_hex: str) -> str:
     return "#000000" if luminance > 0.5 else "#ffffff"
 
 
-def resolve_team_colors(home_abbrev: str, away_abbrev: str) -> dict[str, str]:
-    home_color = NFL_TEAM_COLORS.get(home_abbrev, "#888888")
-    away_color = NFL_TEAM_COLORS.get(away_abbrev, "#888888")
+def resolve_team_colors(
+    home_abbrev: str,
+    away_abbrev: str,
+    fallback: dict[str, tuple[str, str]] | None = None,
+) -> dict[str, str]:
+    """Resolve pill colors for two teams.
+
+    NFL teams use the curated NFL_TEAM_COLORS dict. For any abbreviation not in
+    that dict (e.g. all CFB teams), `fallback` supplies (primary, alternate)
+    colors — pass the ESPN-provided team colors here. Falls back to grey only
+    when nothing is available.
+    """
+    fallback = fallback or {}
+
+    def _primary(abbrev: str) -> str:
+        if abbrev in NFL_TEAM_COLORS:
+            return NFL_TEAM_COLORS[abbrev]
+        fb = fallback.get(abbrev)
+        return fb[0] if fb and fb[0] else "#888888"
+
+    def _alternate(abbrev: str) -> str:
+        if abbrev in NFL_TEAM_ALT_COLORS:
+            return NFL_TEAM_ALT_COLORS[abbrev]
+        fb = fallback.get(abbrev)
+        return fb[1] if fb and fb[1] else _primary(abbrev)
+
+    home_color = _primary(home_abbrev)
+    away_color = _primary(away_abbrev)
+    # If the two primaries are too similar, swap the away team to its alternate.
     if color_distance(home_color, away_color) < _COLOR_DISTANCE_THRESHOLD:
-        away_color = NFL_TEAM_ALT_COLORS.get(away_abbrev, away_color)
+        away_color = _alternate(away_abbrev)
     return {home_abbrev: home_color, away_abbrev: away_color}
+
+
+def _is_valid_hex(color: str) -> bool:
+    h = (color or "").lstrip("#")
+    if len(h) != 6:
+        return False
+    try:
+        int(h, 16)
+        return True
+    except ValueError:
+        return False
+
+
+def team_fallback_colors(*teams) -> dict[str, tuple[str, str]]:
+    """Build a {abbrev: (primary, alternate)} fallback map from Team objects,
+    using their ESPN-provided colors. Skips any malformed/empty color so
+    resolve_team_colors falls through to grey rather than crashing."""
+    out: dict[str, tuple[str, str]] = {}
+    for team in teams:
+        if not team or not team.abbreviation:
+            continue
+        primary = team.color if _is_valid_hex(team.color) else ""
+        alt = team.alternate_color if _is_valid_hex(team.alternate_color) else ""
+        out[team.abbreviation] = (primary, alt)
+    return out
 
 
 def team_color(abbrev: str, color_map: dict[str, str] | None = None) -> str:
