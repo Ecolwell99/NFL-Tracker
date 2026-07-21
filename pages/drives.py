@@ -110,12 +110,12 @@ def _render_special_teams_marker(score: SpecialTeamsScore, color_map: dict) -> N
     st.markdown(
         f"""
         <div style="display:flex; align-items:center; gap:12px; padding:8px 14px;
-                    margin:2px 0; border:1px dashed #888; border-radius:7px; opacity:0.9;">
+                    margin:6px 0 12px 0; border:1px dashed #888; border-radius:7px; opacity:0.9;">
             <div style="background:{team_color}; color:{fg}; padding:2px 10px;
                         border-radius:6px; font-weight:800; font-size:13px;">
                 {score.team.abbreviation}
             </div>
-            <div style="font-size:14px; font-weight:600;">🏈 {label}</div>
+            <div style="font-size:14px; font-weight:600;">{label}</div>
         </div>
         """,
         unsafe_allow_html=True,
