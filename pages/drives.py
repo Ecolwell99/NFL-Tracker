@@ -27,6 +27,7 @@ def render(
     game_away_abbrev: str,
     color_mode: bool = True,
     special_teams_scores: list[SpecialTeamsScore] | None = None,
+    use_curated_colors: bool = True,
 ) -> None:
     special_teams_scores = special_teams_scores or []
     if not drives:
@@ -38,6 +39,7 @@ def render(
     color_map = resolve_team_colors(
         game_away_abbrev, game_home_abbrev,
         fallback=team_fallback_colors(*{d.team.abbreviation: d.team for d in drives}.values()),
+        use_curated=use_curated_colors,
     )
     ev_by_id = {e.drive_id: e for e in evaluated}
     qc_by_id = {q.drive_id: q for q in drive_qcs}

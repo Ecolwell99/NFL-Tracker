@@ -11,6 +11,7 @@ def render(
     game_away_abbrev: str,
     filter_recent: bool = False,
     color_mode: bool = True,
+    use_curated_colors: bool = True,
 ) -> None:
     if not drives:
         st.info("No play data yet.")
@@ -19,6 +20,7 @@ def render(
     color_map = resolve_team_colors(
         game_away_abbrev, game_home_abbrev,
         fallback=team_fallback_colors(*{d.team.abbreviation: d.team for d in drives}.values()),
+        use_curated=use_curated_colors,
     )
 
     # Filter controls

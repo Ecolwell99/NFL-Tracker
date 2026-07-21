@@ -47,24 +47,26 @@ def resolve_team_colors(
     home_abbrev: str,
     away_abbrev: str,
     fallback: dict[str, tuple[str, str]] | None = None,
+    use_curated: bool = True,
 ) -> dict[str, str]:
     """Resolve pill colors for two teams.
 
-    NFL teams use the curated NFL_TEAM_COLORS dict. For any abbreviation not in
-    that dict (e.g. all CFB teams), `fallback` supplies (primary, alternate)
-    colors — pass the ESPN-provided team colors here. Falls back to grey only
-    when nothing is available.
+    When `use_curated` is True (NFL), teams use the hand-tuned NFL_TEAM_COLORS
+    dict. When False (CFB), the curated dict is skipped entirely and colors come
+    from `fallback` (the ESPN-provided team colors) — this avoids cross-league
+    abbreviation collisions, e.g. CFB "HOU" (Houston Cougars, red) vs NFL "HOU"
+    (Houston Texans, navy). Falls back to grey only when nothing is available.
     """
     fallback = fallback or {}
 
     def _primary(abbrev: str) -> str:
-        if abbrev in NFL_TEAM_COLORS:
+        if use_curated and abbrev in NFL_TEAM_COLORS:
             return NFL_TEAM_COLORS[abbrev]
         fb = fallback.get(abbrev)
         return fb[0] if fb and fb[0] else "#888888"
 
     def _alternate(abbrev: str) -> str:
-        if abbrev in NFL_TEAM_ALT_COLORS:
+        if use_curated and abbrev in NFL_TEAM_ALT_COLORS:
             return NFL_TEAM_ALT_COLORS[abbrev]
         fb = fallback.get(abbrev)
         return fb[1] if fb and fb[1] else _primary(abbrev)

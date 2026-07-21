@@ -24,6 +24,7 @@ def _render_scoreboard(game) -> None:
     color_map = resolve_team_colors(
         game.home_team.abbreviation, game.away_team.abbreviation,
         fallback=team_fallback_colors(game.home_team, game.away_team),
+        use_curated=(game.league == League.NFL),
     )
     home = game.home_team
     away = game.away_team
@@ -274,6 +275,7 @@ with tabs[0]:
         game_away_abbrev=game.away_team.abbreviation,
         color_mode=st.session_state.color_mode,
         special_teams_scores=st_scores,
+        use_curated_colors=(league == League.NFL),
     )
 
 with tabs[1]:
@@ -283,6 +285,7 @@ with tabs[1]:
         game_away_abbrev=game.away_team.abbreviation,
         filter_recent=st.session_state.filter_recent,
         color_mode=st.session_state.color_mode,
+        use_curated_colors=(league == League.NFL),
     )
 
 with tabs[2]:
