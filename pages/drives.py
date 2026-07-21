@@ -6,6 +6,7 @@ from qc.comparator import DriveQC
 from utils.colors import resolve_team_colors, pill_text_color
 from components.tables import render_table
 from components.status_badge import drive_status_badge_html
+from rules.scoring import pass_catchers_table
 
 # Make expander labels larger and bolder
 _EXPANDER_CSS = """
@@ -96,6 +97,9 @@ def render(
                 _render_market_detail(ev, qc, color_mode)
                 st.divider()
                 _render_play_log(drive, color_mode)
+                if ev.is_nfl:
+                    st.divider()
+                    _render_pass_catchers(drive)
                 if ev.warnings:
                     st.divider()
                     _render_warnings(ev.warnings)
@@ -231,6 +235,15 @@ def _render_play_log(drive: Drive, color_mode: bool) -> None:
             "Pos":    f"{'Opp' if play.yard_line <= 50 else 'Own'} {abs(50 - play.yard_line) + 50 if play.yard_line > 50 else play.yard_line}",
             "Description": play.description[:80] + ("…" if len(play.description) > 80 else ""),
         })
+    render_table(rows, color_mode=False)
+
+
+def _render_pass_catchers(drive: Drive) -> None:
+    st.markdown("**Pass Catchers**")
+    rows = pass_catchers_table(drive)
+    if not rows:
+        st.info("No pass receptions this drive.")
+        return
     render_table(rows, color_mode=False)
 
 

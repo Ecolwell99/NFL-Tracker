@@ -120,6 +120,44 @@ def pass_catchers_display(drive: Drive) -> str:
     return ", ".join(catchers) if catchers else ""
 
 
+def pass_catchers_table(drive: Drive) -> list[dict]:
+    """
+    NFL only. Per-receiver receptions and receiving yards for this drive.
+    Returns rows [{"Player": "M. Evans", "Rec": 2, "Yds": 34}, ...] ordered
+    by yards descending. Empty list if no completed passes on the drive.
+
+    Yards use ESPN statYardage (air + YAC) — the standard receiving-yards
+    figure, so it matches a box score.
+    """
+    order: list[str] = []
+    tally: dict[str, dict] = {}
+
+    for play in drive.plays:
+        if play.play_type not in (PlayType.PASS_COMPLETE, PlayType.PASSING_TD):
+            continue
+
+        # athletes[1] = receiver on a completion; fall back to description text
+        name = ""
+        if len(play.athletes) >= 2:
+            name = _abbreviated_name(play.athletes[1].display_name)
+        else:
+            parsed = _parse_receiver_from_text(play.description)
+            if parsed:
+                name = parsed  # already in "A.Barner" ESPN short form
+        if not name:
+            continue
+
+        if name not in tally:
+            tally[name] = {"Player": name, "Rec": 0, "Yds": 0}
+            order.append(name)
+        tally[name]["Rec"] += 1
+        tally[name]["Yds"] += int(play.yards or 0)
+
+    rows = [tally[n] for n in order]
+    rows.sort(key=lambda r: r["Yds"], reverse=True)
+    return rows
+
+
 def _abbreviated_name(full_name: str) -> str:
     """Convert 'Mike Evans' → 'M. Evans' to match workbook style."""
     parts = full_name.strip().split()
