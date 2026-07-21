@@ -403,6 +403,17 @@ class ESPNProvider(FootballDataProvider):
             all_raw.append(current)
             current_id = str(current.get("id"))
 
+        # ESPN logs special-teams scores (kickoff/punt return TDs) as standalone
+        # "drives" with zero offensive snaps. Mirror the Excel workbook and drop
+        # any drive with no offensive plays — but keep the live current drive,
+        # which can briefly show 0 plays right after it starts.
+        def _has_offensive_snaps(raw: dict) -> bool:
+            if str(raw.get("id")) == current_id:
+                return True
+            return int(raw.get("offensivePlays", 0) or 0) > 0
+
+        all_raw = [raw for raw in all_raw if _has_offensive_snaps(raw)]
+
         drives = [
             _parse_drive(raw, i + 1, team_map, is_current=(str(raw.get("id")) == current_id))
             for i, raw in enumerate(all_raw)
