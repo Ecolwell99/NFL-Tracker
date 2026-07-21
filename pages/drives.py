@@ -75,13 +75,16 @@ def render(
 
     # Combine drives and special-teams markers into one chronologically
     # ordered stream. Markers carry a .5 sequence so they slot between drives.
-    items: list = [d for d in drives if _keep(d.team.abbreviation)]
-    items += [s for s in special_teams_scores if _keep(s.team.abbreviation)]
-    items.sort(key=lambda x: x.sequence, reverse=st.session_state.drives_newest_first)
+    # Tag each item by kind rather than relying on isinstance — objects returned
+    # from st.cache_data can have a mismatched class identity, which breaks
+    # isinstance() on Streamlit Cloud.
+    items: list = [("drive", d) for d in drives if _keep(d.team.abbreviation)]
+    items += [("st", s) for s in special_teams_scores if _keep(s.team.abbreviation)]
+    items.sort(key=lambda t: t[1].sequence, reverse=st.session_state.drives_newest_first)
 
     # ── Drive expanders ──────────────────────────────────────────────
-    for item in items:
-        if isinstance(item, SpecialTeamsScore):
+    for kind, item in items:
+        if kind == "st":
             _render_special_teams_marker(item, color_map)
             continue
 
