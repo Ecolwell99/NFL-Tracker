@@ -1,7 +1,7 @@
 from __future__ import annotations
 import requests
 from models.game import Game, Team, Score, GameClock, GameStatus, League
-from models.drive import Drive, DriveResult, DriveResultGranular, DriveResultExact, DriveResultGrouped
+from models.drive import Drive, DriveResult, DriveResultGranular, DriveResultExact, DriveResultGrouped, SpecialTeamsScore
 from models.play import Play, PlayType, Player
 from services.provider_base import FootballDataProvider
 
@@ -291,7 +291,13 @@ class ESPNProvider(FootballDataProvider):
 
     def get_drives(self, game_id: str) -> list[Drive]:
         data = _fetch_json(SUMMARY_URL.format(game_id=game_id))
-        return self._parse_drives(game_id, data)
+        drives, _ = self._split_drives(game_id, data)
+        return drives
+
+    def get_special_teams_scores(self, game_id: str) -> list[SpecialTeamsScore]:
+        data = _fetch_json(SUMMARY_URL.format(game_id=game_id))
+        _, st_scores = self._split_drives(game_id, data)
+        return st_scores
 
     def get_plays(self, game_id: str) -> list[Play]:
         drives = self.get_drives(game_id)
@@ -383,10 +389,12 @@ class ESPNProvider(FootballDataProvider):
             status=GameStatus.FINAL,
         )
 
-    def _parse_drives(self, game_id: str, data: dict) -> list[Drive]:
+    def _split_drives(
+        self, game_id: str, data: dict
+    ) -> tuple[list[Drive], list[SpecialTeamsScore]]:
         drives_raw = data.get("drives", {})
         if not drives_raw:
-            return []
+            return [], []
 
         # Build team map from boxscore for fast lookup
         team_map: dict[str, Team] = {}
@@ -412,13 +420,32 @@ class ESPNProvider(FootballDataProvider):
                 return True
             return int(raw.get("offensivePlays", 0) or 0) > 0
 
-        all_raw = [raw for raw in all_raw if _has_offensive_snaps(raw)]
+        # Walk the raw list in game order, keeping offensive drives and turning
+        # dropped zero-snap *scoring* drives into inline markers. The marker's
+        # sort key sits just before the next kept drive's sequence so it renders
+        # in the right chronological spot.
+        drives: list[Drive] = []
+        st_scores: list[SpecialTeamsScore] = []
+        seq = 0
+        for raw in all_raw:
+            if _has_offensive_snaps(raw):
+                seq += 1
+                drive = _parse_drive(
+                    raw, seq, team_map,
+                    is_current=(str(raw.get("id")) == current_id),
+                )
+                drive.game_id = game_id
+                drives.append(drive)
+            elif str(raw.get("result", "")).strip().upper() in ("TD", "SAFETY"):
+                team_raw = raw.get("team", {})
+                team = team_map.get(str(team_raw.get("id", ""))) or _parse_team(team_raw)
+                end_raw = raw.get("end", {})
+                st_scores.append(SpecialTeamsScore(
+                    team=team,
+                    sequence=seq + 0.5,  # between the last kept drive and the next
+                    espn_result=str(raw.get("result", "")).strip().upper(),
+                    score_home=int(end_raw.get("homeScore", 0) or 0) if isinstance(end_raw, dict) else 0,
+                    score_away=int(end_raw.get("awayScore", 0) or 0) if isinstance(end_raw, dict) else 0,
+                ))
 
-        drives = [
-            _parse_drive(raw, i + 1, team_map, is_current=(str(raw.get("id")) == current_id))
-            for i, raw in enumerate(all_raw)
-        ]
-        for d in drives:
-            d.game_id = game_id
-
-        return _assign_team_drive_numbers(drives)
+        return _assign_team_drive_numbers(drives), st_scores

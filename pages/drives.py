@@ -1,6 +1,6 @@
 from __future__ import annotations
 import streamlit as st
-from models.drive import Drive
+from models.drive import Drive, SpecialTeamsScore
 from rules.engine import EvaluatedDrive
 from qc.comparator import DriveQC
 from utils.colors import resolve_team_colors, pill_text_color
@@ -25,7 +25,9 @@ def render(
     game_home_abbrev: str,
     game_away_abbrev: str,
     color_mode: bool = True,
+    special_teams_scores: list[SpecialTeamsScore] | None = None,
 ) -> None:
+    special_teams_scores = special_teams_scores or []
     if not drives:
         st.info("No drives yet.")
         return
@@ -66,14 +68,23 @@ def render(
 
     # ── Filter & order ───────────────────────────────────────────────
     active_filter = st.session_state.drives_team_filter
-    filtered = sorted(
-        [d for d in drives if active_filter == "All" or d.team.abbreviation == active_filter],
-        key=lambda d: d.sequence,
-        reverse=st.session_state.drives_newest_first,
-    )
+
+    def _keep(team_abbrev: str) -> bool:
+        return active_filter == "All" or team_abbrev == active_filter
+
+    # Combine drives and special-teams markers into one chronologically
+    # ordered stream. Markers carry a .5 sequence so they slot between drives.
+    items: list = [d for d in drives if _keep(d.team.abbreviation)]
+    items += [s for s in special_teams_scores if _keep(s.team.abbreviation)]
+    items.sort(key=lambda x: x.sequence, reverse=st.session_state.drives_newest_first)
 
     # ── Drive expanders ──────────────────────────────────────────────
-    for drive in filtered:
+    for item in items:
+        if isinstance(item, SpecialTeamsScore):
+            _render_special_teams_marker(item, color_map)
+            continue
+
+        drive = item
         ev = ev_by_id.get(drive.drive_id)
         qc = qc_by_id.get(drive.drive_id)
         label = _expander_label(drive, ev, game_home_abbrev, game_away_abbrev)
@@ -90,6 +101,25 @@ def render(
                     _render_warnings(ev.warnings)
             else:
                 st.warning("Drive evaluation not available yet.")
+
+
+def _render_special_teams_marker(score: SpecialTeamsScore, color_map: dict) -> None:
+    team_color = color_map.get(score.team.abbreviation, "#555555")
+    fg = pill_text_color(team_color)
+    label = "Special Teams Safety" if score.espn_result == "SAFETY" else "Special Teams TD"
+    st.markdown(
+        f"""
+        <div style="display:flex; align-items:center; gap:12px; padding:8px 14px;
+                    margin:2px 0; border:1px dashed #888; border-radius:7px; opacity:0.9;">
+            <div style="background:{team_color}; color:{fg}; padding:2px 10px;
+                        border-radius:6px; font-weight:800; font-size:13px;">
+                {score.team.abbreviation}
+            </div>
+            <div style="font-size:14px; font-weight:600;">🏈 {label}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _expander_label(

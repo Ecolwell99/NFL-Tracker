@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from models.game import Game
-from models.drive import Drive
+from models.drive import Drive, SpecialTeamsScore
 from models.play import Play
 
 
@@ -31,6 +31,11 @@ class FootballDataProvider(ABC):
     def get_plays(self, game_id: str) -> list[Play]:
         """Return all plays for a game in chronological order."""
         ...
+
+    def get_special_teams_scores(self, game_id: str) -> list[SpecialTeamsScore]:
+        """Return scores logged with no offensive snaps (e.g. kickoff/punt
+        return TDs) that were dropped from the drive list. Optional override."""
+        return []
 
     @abstractmethod
     def get_boxscore(self, game_id: str) -> dict:

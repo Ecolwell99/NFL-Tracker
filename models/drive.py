@@ -42,6 +42,18 @@ class DriveResult:
 
 
 @dataclass
+class SpecialTeamsScore:
+    """A scoring 'drive' ESPN logs with zero offensive snaps — e.g. a kickoff
+    or punt return TD. Not a real offensive drive, so it is dropped from the
+    drive list and surfaced as an inline marker instead."""
+    team: Team
+    sequence: float             # sort key that interleaves with Drive.sequence
+    espn_result: str = ""       # raw ESPN result, e.g. "TD"
+    score_home: int = 0
+    score_away: int = 0
+
+
+@dataclass
 class Drive:
     drive_id: str
     game_id: str

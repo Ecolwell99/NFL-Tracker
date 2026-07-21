@@ -7,7 +7,7 @@ from streamlit_autorefresh import st_autorefresh
 
 from state.session import init_state, reset_game_state
 from services.espn_provider import ESPNProvider, RateLimitedError
-from services.cache import cached_get_games, cached_get_drives, cached_get_game
+from services.cache import cached_get_games, cached_get_drives, cached_get_game, cached_get_special_teams_scores
 from models.game import League, GameStatus
 from rules.engine import evaluate_all_drives
 from qc.comparator import compare_all_drives
@@ -179,6 +179,7 @@ try:
     game_id = st.session_state.selected_game_id
     game    = cached_get_game(game_id)
     drives  = cached_get_drives(game_id)
+    st_scores = cached_get_special_teams_scores(game_id)
 
     evaluated = evaluate_all_drives(drives, League.NFL)
     drive_qcs = compare_all_drives(
@@ -248,6 +249,7 @@ with tabs[0]:
         game_home_abbrev=game.home_team.abbreviation,
         game_away_abbrev=game.away_team.abbreviation,
         color_mode=st.session_state.color_mode,
+        special_teams_scores=st_scores,
     )
 
 with tabs[1]:
