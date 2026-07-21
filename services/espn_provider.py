@@ -5,8 +5,21 @@ from models.drive import Drive, DriveResult, DriveResultGranular, DriveResultExa
 from models.play import Play, PlayType, Player
 from services.provider_base import FootballDataProvider
 
-SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
-SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event={game_id}"
+# ESPN uses the same API shape for both leagues — only the path segment differs.
+_LEAGUE_PATH = {
+    League.NFL: "nfl",
+    League.CFB: "college-football",
+}
+
+
+def _scoreboard_url(league: League) -> str:
+    path = _LEAGUE_PATH.get(league, "nfl")
+    return f"https://site.api.espn.com/apis/site/v2/sports/football/{path}/scoreboard"
+
+
+def _summary_url(league: League, game_id: str) -> str:
+    path = _LEAGUE_PATH.get(league, "nfl")
+    return f"https://site.api.espn.com/apis/site/v2/sports/football/{path}/summary?event={game_id}"
 
 _ESPN_STATUS_MAP = {
     "1": GameStatus.SCHEDULED,
@@ -276,45 +289,45 @@ def _assign_team_drive_numbers(drives: list[Drive]) -> list[Drive]:
 
 class ESPNProvider(FootballDataProvider):
 
-    def get_games(self) -> list[Game]:
-        data = _fetch_json(SCOREBOARD_URL)
+    def get_games(self, league: League = League.NFL) -> list[Game]:
+        data = _fetch_json(_scoreboard_url(league))
         games = []
         for event in data.get("events", []):
-            game = self._parse_event(event)
+            game = self._parse_event(event, league)
             if game:
                 games.append(game)
         return games
 
-    def get_game(self, game_id: str) -> Game:
-        data = _fetch_json(SUMMARY_URL.format(game_id=game_id))
-        return self._parse_summary_game(game_id, data)
+    def get_game(self, game_id: str, league: League = League.NFL) -> Game:
+        data = _fetch_json(_summary_url(league, game_id))
+        return self._parse_summary_game(game_id, data, league)
 
-    def get_drives(self, game_id: str) -> list[Drive]:
-        data = _fetch_json(SUMMARY_URL.format(game_id=game_id))
+    def get_drives(self, game_id: str, league: League = League.NFL) -> list[Drive]:
+        data = _fetch_json(_summary_url(league, game_id))
         drives, _ = self._split_drives(game_id, data)
         return drives
 
-    def get_special_teams_scores(self, game_id: str) -> list[SpecialTeamsScore]:
-        data = _fetch_json(SUMMARY_URL.format(game_id=game_id))
+    def get_special_teams_scores(self, game_id: str, league: League = League.NFL) -> list[SpecialTeamsScore]:
+        data = _fetch_json(_summary_url(league, game_id))
         _, st_scores = self._split_drives(game_id, data)
         return st_scores
 
-    def get_plays(self, game_id: str) -> list[Play]:
-        drives = self.get_drives(game_id)
+    def get_plays(self, game_id: str, league: League = League.NFL) -> list[Play]:
+        drives = self.get_drives(game_id, league)
         plays = []
         for drive in drives:
             plays.extend(drive.plays)
         return plays
 
-    def get_boxscore(self, game_id: str) -> dict:
-        data = _fetch_json(SUMMARY_URL.format(game_id=game_id))
+    def get_boxscore(self, game_id: str, league: League = League.NFL) -> dict:
+        data = _fetch_json(_summary_url(league, game_id))
         return data.get("boxscore", {})
 
     # ------------------------------------------------------------------ #
     # Internal parsers
     # ------------------------------------------------------------------ #
 
-    def _parse_event(self, event: dict) -> Game | None:
+    def _parse_event(self, event: dict, league: League = League.NFL) -> Game | None:
         competitions = event.get("competitions", [])
         if not competitions:
             return None
@@ -346,7 +359,7 @@ class ESPNProvider(FootballDataProvider):
 
         return Game(
             game_id=str(event.get("id", "")),
-            league=League.NFL,
+            league=league,
             home_team=home_team,
             away_team=away_team,
             date=event.get("date", ""),
@@ -358,7 +371,7 @@ class ESPNProvider(FootballDataProvider):
             week=week_num,
         )
 
-    def _parse_summary_game(self, game_id: str, data: dict) -> Game:
+    def _parse_summary_game(self, game_id: str, data: dict, league: League = League.NFL) -> Game:
         # summary endpoint wraps game info differently
         header = data.get("header", {})
         competitions = header.get("competitions", [])
@@ -371,7 +384,7 @@ class ESPNProvider(FootballDataProvider):
                 "season": header_season if isinstance(header_season, dict) else {},
                 "week": header.get("week") or {},
             }
-            game = self._parse_event(fake_event)
+            game = self._parse_event(fake_event, league)
             if game:
                 return game
 
@@ -382,7 +395,7 @@ class ESPNProvider(FootballDataProvider):
         away_raw = next((t for t in teams if t.get("homeAway") == "away"), teams[1] if len(teams) > 1 else {})
         return Game(
             game_id=game_id,
-            league=League.NFL,
+            league=league,
             home_team=_parse_team(home_raw.get("team", {})),
             away_team=_parse_team(away_raw.get("team", {})),
             date="",

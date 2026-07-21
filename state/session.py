@@ -6,10 +6,14 @@ Increment STATE_VERSION whenever the shape of state changes to force a reset.
 """
 from __future__ import annotations
 import streamlit as st
+from models.game import League
 
-STATE_VERSION = 1
+STATE_VERSION = 2
 
 _DEFAULTS: dict = {
+    # League selection
+    "league":                   League.NFL, # League enum
+
     # Game selection
     "games":                    [],         # list[Game]
     "selected_game_id":         None,       # str | None

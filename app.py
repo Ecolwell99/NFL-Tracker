@@ -61,7 +61,7 @@ def _render_scoreboard(game) -> None:
 
 # ── App config ──────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="NFL Markets QC",
+    page_title="Football Markets QC",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -79,13 +79,33 @@ init_state()
 
 # ── Sidebar ──────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## NFL Markets")
+    st.markdown("## Football Markets")
+
+    # League toggle — switching leagues wipes the loaded game (and, via
+    # reset_game_state, the corrections log) so NFL/CFB data never mixes.
+    league_choice = st.radio(
+        "League",
+        options=[League.NFL, League.CFB],
+        format_func=lambda l: l.value,
+        horizontal=True,
+        index=0 if st.session_state.league == League.NFL else 1,
+        label_visibility="collapsed",
+    )
+    if league_choice != st.session_state.league:
+        st.session_state.league = league_choice
+        st.session_state.games = []
+        st.session_state.selected_game_id = None
+        st.session_state.selected_game_label = None
+        st.session_state.tracking = False
+        reset_game_state()
+        st.rerun()
+
     st.divider()
 
     # Game selector
     if st.button("Load Live Games", use_container_width=True):
         try:
-            games = cached_get_games()
+            games = cached_get_games(st.session_state.league)
             st.session_state.games = games
             if not games:
                 st.info("No live games right now.")
@@ -177,11 +197,12 @@ if st.session_state.rate_limit_skip_remaining > 0:
 # ── Data fetch & evaluation ──────────────────────────────────────────
 try:
     game_id = st.session_state.selected_game_id
-    game    = cached_get_game(game_id)
-    drives  = cached_get_drives(game_id)
-    st_scores = cached_get_special_teams_scores(game_id)
+    league  = st.session_state.league
+    game    = cached_get_game(game_id, league)
+    drives  = cached_get_drives(game_id, league)
+    st_scores = cached_get_special_teams_scores(game_id, league)
 
-    evaluated = evaluate_all_drives(drives, League.NFL)
+    evaluated = evaluate_all_drives(drives, league)
     drive_qcs = compare_all_drives(
         evaluated,
         st.session_state.system_results,
