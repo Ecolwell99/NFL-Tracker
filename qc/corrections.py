@@ -165,8 +165,8 @@ def _markets_impacted_by_play_change(
 
         # All per-play yardage markets are NFL-only and fire on exact crossing
         # only. No yardline markets here: a single play's yardage can't move a
-        # drive-crossing market — that's caught by the drive-level yards /
-        # start_yl / end_yl diff, which maps to the yardline markets.
+        # drive-crossing market — that's caught by the drive-level Furthest
+        # Advance (min_yte) crossing test.
         if is_nfl:
             if is_catch and _crosses(prev_yards, yards, 19.5):
                 markets += ["20+ Yard Passing Play"]
@@ -178,9 +178,6 @@ def _markets_impacted_by_play_change(
                 markets += ["Rusher Over 3.5 Yards"]
             if is_catch and _crosses(prev_yards, yards, 9.5):
                 markets += ["Next Catch Over 9.5 Yards"]
-
-    if field in ("yard_line", "end_yl"):
-        markets += _YARDLINE_MARKETS
 
     if field == "athletes":
         markets += ["TD Scorer"]
@@ -226,7 +223,11 @@ def diff_drives(
         prev_snap = previous[drive_id]
 
         # ── Drive-level fields ────────────────────────────────────────
-        for field in ("espn_result", "yards", "start_yl", "end_yl"):
+        # Only the drive result is tracked here. Yardline crossing is handled
+        # by the min_yte (Furthest Advance) test below; drive total yards and
+        # start/end position are intentionally NOT logged — they carry no market
+        # impact of their own and duplicate the Furthest Advance card.
+        for field in ("espn_result",):
             prev_val = str(prev_snap.get(field, ""))
             curr_val = str(curr_snap.get(field, ""))
             if prev_val != curr_val and prev_val and curr_val:
@@ -282,7 +283,10 @@ def diff_drives(
             if play_id not in prev_plays:
                 continue
             prev_play = prev_plays[play_id]
-            for field in ("type", "yards", "yard_line", "end_yl", "scoring", "athletes"):
+            # yard_line / end_yl deliberately excluded: a play's position change
+            # is captured by the drive-level Furthest Advance test, so logging it
+            # here would just duplicate that card (often as a market-less "None").
+            for field in ("type", "yards", "scoring", "athletes"):
                 pv = prev_play.get(field)
                 cv = curr_play.get(field)
                 if pv != cv and pv is not None and cv is not None:
