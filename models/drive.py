@@ -20,7 +20,7 @@ class DriveResultGranular(Enum):
 
 class DriveResultExact(Enum):
     TD = "TD"
-    FG = "FG"
+    FG = "FG Attempt"
     PUNT = "Punt"
     TURNOVER = "Turnover"
     VOID = "Void"

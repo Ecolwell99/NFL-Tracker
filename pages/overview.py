@@ -83,7 +83,7 @@ def _render_drive_summary(
 
     total_drives = len([d for d in drives if d.espn_result not in ("END OF HALF", "END OF GAME")])
     td_drives = sum(1 for e in evaluated if e.result_exact == "TD")
-    fg_drives = sum(1 for e in evaluated if e.result_exact == "FG")
+    fg_drives = sum(1 for e in evaluated if e.result_exact == "FG Attempt")
     turnover_drives = sum(1 for e in evaluated if e.result_exact == "Turnover")
 
     with col1:
