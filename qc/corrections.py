@@ -128,25 +128,24 @@ def _markets_impacted_by_play_change(
     if field == "yards":
         yards = int(play_snap.get("yards", 0))
         prev_yards = int(prev_snap.get("yards", 0)) if prev_snap else yards
-        if "Pass" in play_type or "Touchdown" in play_type:
-            if abs(yards) >= 15:  # could cross 20-yard threshold
-                markets += ["20+ Yard Passing Play", "20+ Yard Play"]
-        if "Rush" in play_type:
-            if abs(yards) >= 8:   # could cross 10-yard threshold
-                markets += ["10+ Yard Rushing Play"]
-            if abs(yards) >= 15:
-                markets += ["20+ Yard Play"]
+        is_rush = play_type in ("Rush", "Rushing Touchdown")
+        is_catch = play_type in ("Pass Reception", "Passing Touchdown")
 
-        # NFL-only micro-market thresholds — exact crossing only.
+        # All per-play yardage markets are NFL-only and fire on exact crossing
+        # only. No yardline markets here: a single play's yardage can't move a
+        # drive-crossing market — that's caught by the drive-level yards /
+        # start_yl / end_yl diff, which maps to the yardline markets.
         if is_nfl:
-            is_rush = play_type in ("Rush", "Rushing Touchdown")
-            is_catch = play_type in ("Pass Reception", "Passing Touchdown")
+            if is_catch and _crosses(prev_yards, yards, 19.5):
+                markets += ["20+ Yard Passing Play"]
+            if (is_rush or is_catch) and _crosses(prev_yards, yards, 19.5):
+                markets += ["20+ Yard Play"]
+            if is_rush and _crosses(prev_yards, yards, 9.5):
+                markets += ["10+ Yard Rushing Play"]
             if is_rush and _crosses(prev_yards, yards, 3.5):
                 markets += ["Rusher Over 3.5 Yards"]
             if is_catch and _crosses(prev_yards, yards, 9.5):
                 markets += ["Next Catch Over 9.5 Yards"]
-
-        markets += _YARDLINE_MARKETS
 
     if field in ("yard_line", "end_yl"):
         markets += _YARDLINE_MARKETS
