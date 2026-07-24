@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from models.drive import Drive, DriveResultGranular
 from models.play import Play
+from rules.yardlines import _min_yards_to_endzone
 
 
 # ------------------------------------------------------------------ #
@@ -50,6 +51,9 @@ def snapshot_drive(drive: Drive) -> dict:
         "play_count":  drive.play_count,
         "start_yl":    drive.start_yardline,
         "end_yl":      drive.end_yardline,
+        # Furthest advance (min yards-to-endzone) — mirrors settlement logic in
+        # rules/yardlines.py. Drives the yardline-crossing market impact test.
+        "min_yte":     _min_yards_to_endzone(drive),
         "plays":       {p.play_id: snapshot_play(p) for p in drive.plays},
     }
 
@@ -99,9 +103,12 @@ _EXPLOSIVE_PLAY_MARKETS = [
 def _markets_impacted_by_drive_change(field: str) -> list[str]:
     if field == "espn_result":
         return _DRIVE_RESULT_MARKETS
-    if field in ("start_yl", "end_yl", "yards"):
-        return _YARDLINE_MARKETS
-    return ["Drive Result Granular"]
+    # Drive yards / start / end position changes are logged as informational
+    # corrections. The yardline-crossing markets are NOT flagged here — they
+    # fire only from the dedicated min_yte crossing test (see diff_drives),
+    # which mirrors settlement: a market moves only when the drive's furthest
+    # advance actually crosses that specific line.
+    return []
 
 
 def _crosses(prev_yards: int, curr_yards: int, line: float) -> bool:
@@ -110,6 +117,31 @@ def _crosses(prev_yards: int, curr_yards: int, line: float) -> bool:
     threshold). Straddle test: one side under, the other over.
     """
     return (prev_yards <= line) != (curr_yards <= line)
+
+
+# Yards-to-endzone line for each crossing market. Ball must reach the opp
+# 49/34/19 or closer to cross (strict <), so the straddle line sits at .5 below
+# the threshold: crossing 50 => min_yte moves across 49.5, etc.
+_YARDLINE_CROSS_TESTS = [
+    (49.5, "Drive Crosses 50"),
+    (34.5, "Drive Crosses Opposing 35"),
+    (19.5, "Drive Crosses Opposing 20"),
+]
+
+
+def _yardline_markets_crossed(prev_min_yte: int, curr_min_yte: int) -> list[str]:
+    """
+    Which yardline-crossing markets flipped when a drive's furthest advance
+    (min yards-to-endzone) was revised. A market fires only if the specific
+    line was straddled. Lower yte = deeper into opponent territory, so a
+    revision that *reduces* min_yte across a line = crossed it (Yes); one that
+    *increases* it back across = un-crossed (also a real change to flag).
+    """
+    markets = []
+    for line, market in _YARDLINE_CROSS_TESTS:
+        if _crosses(prev_min_yte, curr_min_yte, line):
+            markets.append(market)
+    return markets
 
 
 def _markets_impacted_by_play_change(
@@ -208,6 +240,24 @@ def diff_drives(
                     markets_impacted=_markets_impacted_by_drive_change(field),
                 ))
 
+        # ── Yardline crossing (furthest advance) ──────────────────────
+        # Fire a dedicated correction only for lines the drive's furthest
+        # advance actually straddled — mirrors settlement in rules/yardlines.py.
+        prev_min = prev_snap.get("min_yte")
+        curr_min = curr_snap.get("min_yte")
+        if prev_min is not None and curr_min is not None and prev_min != curr_min:
+            crossed = _yardline_markets_crossed(int(prev_min), int(curr_min))
+            if crossed:
+                corrections.append(StatCorrection(
+                    detected_at=detected_at,
+                    drive_id=drive_id,
+                    drive_label=label,
+                    field="Furthest Advance",
+                    previous_value=str(prev_min),
+                    new_value=str(curr_min),
+                    markets_impacted=crossed,
+                ))
+
         # ── Play-level fields ─────────────────────────────────────────
         prev_plays = prev_snap.get("plays", {})
         curr_plays = curr_snap.get("plays", {})
@@ -259,6 +309,7 @@ def _field_display_name(field: str) -> str:
         "start_yl":    "Start Field Position",
         "end_yl":      "End Field Position",
         "play_count":  "Play Count",
+        "min_yte":     "Furthest Advance",
     }.get(field, field)
 
 
