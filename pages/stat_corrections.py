@@ -26,7 +26,7 @@ def render(corrections: list[StatCorrection], color_mode: bool = True) -> None:
 
 
 def _render_correction_card(c: StatCorrection) -> None:
-    markets_str = ", ".join(c.markets_impacted) if c.markets_impacted else "Unknown"
+    markets_str = ", ".join(c.markets_impacted) if c.markets_impacted else "None"
     play_str = (
         f'<div style="font-size:11px; opacity:0.6; margin-top:4px; font-style:italic;">'
         f'{c.play_description}</div>'
