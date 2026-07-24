@@ -219,7 +219,10 @@ try:
     label_map   = build_drive_label_map(drives)
 
     if prev_snaps:
-        new_corrections = diff_drives(prev_snaps, curr_snaps, label_map, detected_at)
+        new_corrections = diff_drives(
+            prev_snaps, curr_snaps, label_map, detected_at,
+            is_nfl=(league == League.NFL),
+        )
         if new_corrections:
             st.session_state.stat_corrections = merge_corrections(
                 st.session_state.stat_corrections, new_corrections

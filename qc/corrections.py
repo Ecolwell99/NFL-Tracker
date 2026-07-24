@@ -104,7 +104,20 @@ def _markets_impacted_by_drive_change(field: str) -> list[str]:
     return ["Drive Result Granular"]
 
 
-def _markets_impacted_by_play_change(field: str, play_snap: dict) -> list[str]:
+def _crosses(prev_yards: int, curr_yards: int, line: float) -> bool:
+    """
+    True if a yardage revision moved the play across `line` (an Over/Under
+    threshold). Straddle test: one side under, the other over.
+    """
+    return (prev_yards <= line) != (curr_yards <= line)
+
+
+def _markets_impacted_by_play_change(
+    field: str,
+    play_snap: dict,
+    prev_snap: dict | None = None,
+    is_nfl: bool = True,
+) -> list[str]:
     play_type = play_snap.get("type", "")
     markets = []
 
@@ -114,6 +127,7 @@ def _markets_impacted_by_play_change(field: str, play_snap: dict) -> list[str]:
 
     if field == "yards":
         yards = int(play_snap.get("yards", 0))
+        prev_yards = int(prev_snap.get("yards", 0)) if prev_snap else yards
         if "Pass" in play_type or "Touchdown" in play_type:
             if abs(yards) >= 15:  # could cross 20-yard threshold
                 markets += ["20+ Yard Passing Play", "20+ Yard Play"]
@@ -122,6 +136,16 @@ def _markets_impacted_by_play_change(field: str, play_snap: dict) -> list[str]:
                 markets += ["10+ Yard Rushing Play"]
             if abs(yards) >= 15:
                 markets += ["20+ Yard Play"]
+
+        # NFL-only micro-market thresholds — exact crossing only.
+        if is_nfl:
+            is_rush = play_type in ("Rush", "Rushing Touchdown")
+            is_catch = play_type in ("Pass Reception", "Passing Touchdown")
+            if is_rush and _crosses(prev_yards, yards, 3.5):
+                markets += ["Rusher Over 3.5 Yards"]
+            if is_catch and _crosses(prev_yards, yards, 9.5):
+                markets += ["Next Catch Over 9.5 Yards"]
+
         markets += _YARDLINE_MARKETS
 
     if field in ("yard_line", "end_yl"):
@@ -145,6 +169,7 @@ def diff_drives(
     current: dict[str, dict],
     drive_labels: dict[str, str],
     detected_at: str,
+    is_nfl: bool = True,
 ) -> list[StatCorrection]:
     """
     Compare previous snapshot against current snapshot.
@@ -155,6 +180,8 @@ def diff_drives(
         current:      snapshot_all_drives() from this refresh cycle
         drive_labels: drive_id → display label (for human-readable output)
         detected_at:  timestamp string e.g. "12:34:05 PM ET"
+        is_nfl:       gates NFL-only micro-market thresholds
+                      (Rusher Over 3.5 Yards, Next Catch Over 9.5 Yards)
     """
     corrections: list[StatCorrection] = []
 
@@ -217,7 +244,9 @@ def diff_drives(
                         field=_play_field_display_name(field),
                         previous_value=str(pv),
                         new_value=str(cv),
-                        markets_impacted=_markets_impacted_by_play_change(field, curr_play),
+                        markets_impacted=_markets_impacted_by_play_change(
+                            field, curr_play, prev_play, is_nfl
+                        ),
                         play_description=curr_play.get("description", "")[:100],
                     ))
 
