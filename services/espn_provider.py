@@ -421,8 +421,19 @@ class ESPNProvider(FootballDataProvider):
         all_raw = list(previous)
         current_id = None
         if isinstance(current, dict) and current.get("id"):
-            all_raw.append(current)
             current_id = str(current.get("id"))
+            # ESPN includes the in-progress drive in BOTH previous[] and current
+            # while it is live. Appending unconditionally parsed it twice, and
+            # since is_current is set by id match, both copies rendered as LIVE
+            # (a phantom "Drive N+1" that never resulted and vanished on the next
+            # possession). Replace the stale previous[] copy in place — that keeps
+            # game order and prefers current's fresher play list.
+            for i, raw in enumerate(all_raw):
+                if str(raw.get("id")) == current_id:
+                    all_raw[i] = current
+                    break
+            else:
+                all_raw.append(current)
 
         # ESPN logs special-teams scores (kickoff/punt return TDs) as standalone
         # "drives" with zero offensive snaps. Mirror the Excel workbook and drop
