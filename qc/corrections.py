@@ -51,8 +51,10 @@ def snapshot_drive(drive: Drive) -> dict:
         "play_count":  drive.play_count,
         "start_yl":    drive.start_yardline,
         "end_yl":      drive.end_yardline,
-        # Furthest advance (min yards-to-endzone) — mirrors settlement logic in
-        # rules/yardlines.py. Drives the yardline-crossing market impact test.
+        # Furthest advance (min yards-to-endzone) straight from settlement logic
+        # in rules/yardlines.py. Informational/debug only — the crossing test in
+        # diff_drives recomputes this over the plays shared by both snapshots so
+        # a drive merely advancing can't look like a correction.
         "min_yte":     _min_yards_to_endzone(drive),
         "plays":       {p.play_id: snapshot_play(p) for p in drive.plays},
     }
@@ -144,6 +146,29 @@ def _yardline_markets_crossed(prev_min_yte: int, curr_min_yte: int) -> list[str]
     return markets
 
 
+# Play type values that reach the endzone (mirrors Play.is_touchdown).
+_TD_PLAY_TYPES = ("Passing Touchdown", "Rushing Touchdown")
+
+
+def _min_yte_from_play_snaps(play_snaps: list[dict]) -> int | None:
+    """
+    Recompute furthest advance (min yards-to-endzone) from a set of play
+    snapshots. Mirrors _min_yards_to_endzone in rules/yardlines.py: a TD play
+    counts as 0, and non-positive endpoints are excluded (own endzone / missing
+    data). Returns None when no play carries a usable position — there is then
+    no basis for a before/after comparison.
+    """
+    endpoints: list[int] = []
+    for snap in play_snaps:
+        if snap.get("type") in _TD_PLAY_TYPES:
+            return 0
+        for key in ("end_yl", "yard_line"):
+            val = snap.get(key)
+            if isinstance(val, int) and val > 0:
+                endpoints.append(val)
+    return min(endpoints) if endpoints else None
+
+
 def _markets_impacted_by_play_change(
     field: str,
     play_snap: dict,
@@ -223,10 +248,10 @@ def diff_drives(
         prev_snap = previous[drive_id]
 
         # ── Drive-level fields ────────────────────────────────────────
-        # Only the drive result is tracked here. Yardline crossing is handled
-        # by the min_yte (Furthest Advance) test below; drive total yards and
-        # start/end position are intentionally NOT logged — they carry no market
-        # impact of their own and duplicate the Furthest Advance card.
+        # Only the drive result is tracked here. Yardline crossing is handled by
+        # the Furthest Advance test further down; drive total yards and start/end
+        # position are intentionally NOT logged — they carry no market impact of
+        # their own and duplicate the Furthest Advance card.
         for field in ("espn_result",):
             prev_val = str(prev_snap.get(field, ""))
             curr_val = str(curr_snap.get(field, ""))
@@ -241,27 +266,38 @@ def diff_drives(
                     markets_impacted=_markets_impacted_by_drive_change(field),
                 ))
 
-        # ── Yardline crossing (furthest advance) ──────────────────────
-        # Fire a dedicated correction only for lines the drive's furthest
-        # advance actually straddled — mirrors settlement in rules/yardlines.py.
-        prev_min = prev_snap.get("min_yte")
-        curr_min = curr_snap.get("min_yte")
-        if prev_min is not None and curr_min is not None and prev_min != curr_min:
-            crossed = _yardline_markets_crossed(int(prev_min), int(curr_min))
-            if crossed:
-                corrections.append(StatCorrection(
-                    detected_at=detected_at,
-                    drive_id=drive_id,
-                    drive_label=label,
-                    field="Furthest Advance",
-                    previous_value=str(prev_min),
-                    new_value=str(curr_min),
-                    markets_impacted=crossed,
-                ))
-
         # ── Play-level fields ─────────────────────────────────────────
         prev_plays = prev_snap.get("plays", {})
         curr_plays = curr_snap.get("plays", {})
+
+        # ── Yardline crossing (furthest advance) ──────────────────────
+        # Fire a dedicated correction only for lines the drive's furthest
+        # advance actually straddled — mirrors settlement in rules/yardlines.py.
+        #
+        # The comparison is restricted to plays present in BOTH snapshots. The
+        # stored min_yte covers every play in its cycle, so a live drive simply
+        # ADVANCING (new play snapped, ball now deeper) moved min_yte and was
+        # reported as a stat correction — e.g. ARI on the CAR 40 gaining to the
+        # CAR 25 flagged "Drive Crosses Opposing 35". That is normal play, not
+        # ESPN revising history. Recomputing over the shared play set holds new
+        # plays out of the test, so this fires only when ESPN actually changes
+        # the position of a play it already reported.
+        shared_ids = [pid for pid in curr_plays if pid in prev_plays]
+        if shared_ids:
+            prev_min = _min_yte_from_play_snaps([prev_plays[pid] for pid in shared_ids])
+            curr_min = _min_yte_from_play_snaps([curr_plays[pid] for pid in shared_ids])
+            if prev_min is not None and curr_min is not None and prev_min != curr_min:
+                crossed = _yardline_markets_crossed(prev_min, curr_min)
+                if crossed:
+                    corrections.append(StatCorrection(
+                        detected_at=detected_at,
+                        drive_id=drive_id,
+                        drive_label=label,
+                        field="Furthest Advance",
+                        previous_value=str(prev_min),
+                        new_value=str(curr_min),
+                        markets_impacted=crossed,
+                    ))
 
         # Removed plays
         for play_id in prev_plays:
