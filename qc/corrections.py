@@ -169,6 +169,37 @@ def _min_yte_from_play_snaps(play_snaps: list[dict]) -> int | None:
     return min(endpoints) if endpoints else None
 
 
+# Kick/punt and return play types. A type change on one of these is a return
+# event (e.g. ESPN appending "FUMB" to a punt when the returner fumbles) and is
+# NOT logged as a correction — see the type loop in diff_drives. Field goals are
+# deliberately absent: FG Good <-> Missed genuinely moves the drive result.
+_ST_RETURN_TYPES = (
+    "Punt",
+    "Punt Return",
+    "Kickoff",
+    "Kickoff Return",
+    "Fair Catch",
+)
+
+
+def _explosive_markets_satisfied(play_type: str, yards: int) -> set[str]:
+    """
+    Which explosive-play markets a single play would settle Yes on, given its
+    type and yardage. Used to diff before/after a type revision so a market is
+    only reported when the answer actually changes.
+    """
+    is_rush = play_type in ("Rush", "Rushing Touchdown")
+    is_catch = play_type in ("Pass Reception", "Passing Touchdown")
+    satisfied = set()
+    if is_catch and yards >= 20:
+        satisfied.add("20+ Yard Passing Play")
+    if is_rush and yards >= 10:
+        satisfied.add("10+ Yard Rushing Play")
+    if (is_rush or is_catch) and yards >= 20:
+        satisfied.add("20+ Yard Play")
+    return satisfied
+
+
 def _markets_impacted_by_play_change(
     field: str,
     play_snap: dict,
@@ -180,7 +211,17 @@ def _markets_impacted_by_play_change(
 
     if field == "type":
         markets += _DRIVE_RESULT_MARKETS
-        markets += _EXPLOSIVE_PLAY_MARKETS
+        # Explosive-play markets are NFL-only and were previously listed for ANY
+        # type change regardless of yardage — a 7-yard play reclassified would
+        # claim "20+ Yard Passing Play" was impacted. Report only markets whose
+        # Yes/No answer actually differs between the old and new play type.
+        if is_nfl:
+            yards = int(play_snap.get("yards", 0) or 0)
+            prev_type = prev_snap.get("type", "") if prev_snap else play_type
+            before = _explosive_markets_satisfied(prev_type, yards)
+            after = _explosive_markets_satisfied(play_type, yards)
+            flipped = before ^ after  # symmetric difference = genuinely changed
+            markets += [m for m in _EXPLOSIVE_PLAY_MARKETS if m in flipped]
 
     if field == "yards":
         yards = int(play_snap.get("yards", 0))
@@ -325,19 +366,30 @@ def diff_drives(
             for field in ("type", "yards", "scoring", "athletes"):
                 pv = prev_play.get(field)
                 cv = curr_play.get(field)
-                if pv != cv and pv is not None and cv is not None:
-                    corrections.append(StatCorrection(
-                        detected_at=detected_at,
-                        drive_id=drive_id,
-                        drive_label=label,
-                        field=_play_field_display_name(field),
-                        previous_value=str(pv),
-                        new_value=str(cv),
-                        markets_impacted=_markets_impacted_by_play_change(
-                            field, curr_play, prev_play, is_nfl
-                        ),
-                        play_description=curr_play.get("description", "")[:100],
-                    ))
+                if pv == cv or pv is None or cv is None:
+                    continue
+                # Skip type changes on kicks/returns. ESPN reclassifies a punt to
+                # Fumble when the RETURNER fumbles (it appends "FUMB" to the punt
+                # text), which read as "Carolina Drive 1 corrected Punt -> Fumble"
+                # even though the punting team's drive result never changed and
+                # the Drives tab still correctly showed Punt. A return event moves
+                # no market for the drive's own team, so it is not a correction.
+                if field == "type" and (
+                    str(pv) in _ST_RETURN_TYPES or str(cv) in _ST_RETURN_TYPES
+                ):
+                    continue
+                corrections.append(StatCorrection(
+                    detected_at=detected_at,
+                    drive_id=drive_id,
+                    drive_label=label,
+                    field=_play_field_display_name(field),
+                    previous_value=str(pv),
+                    new_value=str(cv),
+                    markets_impacted=_markets_impacted_by_play_change(
+                        field, curr_play, prev_play, is_nfl
+                    ),
+                    play_description=curr_play.get("description", "")[:100],
+                ))
 
     return corrections
 
