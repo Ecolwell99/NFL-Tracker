@@ -64,18 +64,19 @@ def render(
     # Empty state for "genuinely nothing happened" — this is the ONLY green
     # all-clear. The filtered-to-zero case further down must never render green.
     #
-    # The filter row still renders below it. It is deliberately NOT behind this
-    # early return: a trader watching a game that has not yet produced a
-    # correction should be able to preset Play=Rush at kickoff, and hiding the
-    # controls entirely also made the feature look undeployed.
+    # The filter row renders ABOVE it and is deliberately NOT behind this early
+    # return: a trader watching a game that has not yet produced a correction
+    # should be able to preset Play=Rush at kickoff, and hiding the controls
+    # entirely also made the feature look undeployed.
     if not corrections:
+        _render_filter_row(corrections, game_home_abbrev, game_away_abbrev)
         st.markdown(
             '<div style="padding:24px; text-align:center; background:#132117; '
-            'border-radius:10px; color:#66ff99; font-size:20px; font-weight:700;">'
+            'border-radius:10px; color:#66ff99; font-size:20px; font-weight:700; '
+            'margin-top:16px;">'
             '✓ No stat corrections detected</div>',
             unsafe_allow_html=True,
         )
-        _render_filter_row(corrections, game_home_abbrev, game_away_abbrev)
         return
 
     # Banner counts ALL corrections, never the filtered subset. A filter set in
@@ -118,7 +119,7 @@ def render(
         st.markdown(
             '<div style="padding:20px; text-align:center; '
             'background:var(--secondary-background-color); border-radius:10px; '
-            'opacity:0.7; font-size:15px; font-weight:600;">'
+            'opacity:0.7; font-size:15px; font-weight:600; margin-top:8px;">'
             'No corrections match this filter</div>',
             unsafe_allow_html=True,
         )
