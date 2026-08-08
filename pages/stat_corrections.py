@@ -59,8 +59,15 @@ def render(
     game_home_abbrev: str = "",
     game_away_abbrev: str = "",
 ) -> None:
+    _init_filter_state()
+
     # Empty state for "genuinely nothing happened" — this is the ONLY green
-    # all-clear. The filtered-to-zero case below must never render green.
+    # all-clear. The filtered-to-zero case further down must never render green.
+    #
+    # The filter row still renders below it. It is deliberately NOT behind this
+    # early return: a trader watching a game that has not yet produced a
+    # correction should be able to preset Play=Rush at kickoff, and hiding the
+    # controls entirely also made the feature look undeployed.
     if not corrections:
         st.markdown(
             '<div style="padding:24px; text-align:center; background:#132117; '
@@ -68,9 +75,8 @@ def render(
             '✓ No stat corrections detected</div>',
             unsafe_allow_html=True,
         )
+        _render_filter_row(corrections, game_home_abbrev, game_away_abbrev)
         return
-
-    _init_filter_state()
 
     # Banner counts ALL corrections, never the filtered subset. A filter set in
     # Q1 must not be able to hide the fact that a Q4 correction exists.
