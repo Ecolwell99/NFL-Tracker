@@ -58,7 +58,7 @@ _DEFAULTS: dict = {
     # Corrections tab filters. Persist across refresh cycles (so a filter set
     # mid-game holds) but ARE cleared by reset_game_state — a filter left over
     # from the previous game would silently hide the new game's corrections.
-    "corr_impact_filter":       "All",     # All | Market-Moving | No Impact
+    "corr_impact_filter":       "All",     # All | Market Impacted | No Impact
     "corr_team_filter":         "All",     # All | away abbrev | home abbrev
     "corr_field_filter":        "All",     # All | StatCorrection.field value
     "corr_play_filter":         "All",     # All | Rush | Pass

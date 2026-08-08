@@ -8,7 +8,7 @@ from qc.corrections import (
 # values are stable — see the tab-navigation note in app.py for why a filter's
 # stored value must never be a string that can stop existing.
 _IMPACT_ALL    = "All"
-_IMPACT_MARKET = "Market-Moving"
+_IMPACT_MARKET = "Market Impacted"
 _IMPACT_NONE   = "No Impact"
 
 _ANY = "All"
@@ -139,6 +139,14 @@ def _render_filter_row(
     away_abbrev: str,
 ) -> None:
     # Impact — button row, mirrors the Drives tab team filter.
+    #
+    # Guard against a stored value that is no longer one of the three options —
+    # e.g. a session still holding the old "Market-Moving" label after it was
+    # renamed to "Market Impacted". Without this no button reads as selected and
+    # the filter matches nothing, silently hiding every card.
+    if st.session_state.corr_impact_filter not in (_IMPACT_ALL, _IMPACT_MARKET, _IMPACT_NONE):
+        st.session_state.corr_impact_filter = _IMPACT_ALL
+
     cols = st.columns([1, 1, 1, 3])
     for col, label in zip(cols, (_IMPACT_ALL, _IMPACT_MARKET, _IMPACT_NONE)):
         with col:
