@@ -11,7 +11,11 @@ _IMPACT_ALL    = "All"
 _IMPACT_MARKET = "Market Impacted"
 _IMPACT_NONE   = "No Impact"
 
-_ANY = "All"
+# Team / Type / Play are multiselects: an EMPTY selection means "no filter", i.e.
+# show everything. There is deliberately no "All" sentinel inside the options —
+# "All" ticked alongside "Rush" is self-contradictory, and the Play-by-Play tab's
+# `"All" not in filter` pattern has to special-case it everywhere. Empty-means-all
+# needs no sentinel and reads naturally in the placeholder.
 
 # Every value StatCorrection.field can hold, in the order they appear in
 # qc/corrections.py. Fixed list rather than derived, so the dropdown does not
@@ -35,17 +39,23 @@ _PLAY_CLASS_FILTERS = [PLAY_CLASS_RUSH, PLAY_CLASS_PASS]
 _DRIVE_LEVEL_FIELDS = frozenset({"Drive Result", "Furthest Advance"})
 
 
+_MULTI_KEYS = ("corr_team_filter", "corr_field_filter", "corr_play_filter")
+
+
 def _init_filter_state() -> None:
-    defaults = {
-        "corr_impact_filter": _IMPACT_ALL,
-        "corr_team_filter":   _ANY,
-        "corr_field_filter":  _ANY,
-        "corr_play_filter":   _ANY,
-        "corr_market_filter": _ANY,
-    }
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+    # Impact stays single-select (its three options are mutually exclusive: "All"
+    # IS the both-of-them case, so a multiselect would offer a meaningless
+    # Market+None combination). Team/Type/Play are lists — empty means show all.
+    if "corr_impact_filter" not in st.session_state:
+        st.session_state.corr_impact_filter = _IMPACT_ALL
+    for key in _MULTI_KEYS:
+        # A pre-upgrade session holds a plain string here ("All" / "Rush") from
+        # when these were selectboxes. Coerce rather than crash on .copy()/list
+        # ops: a leftover "All" becomes [] (show everything), any other string
+        # becomes a one-item list preserving the trader's active filter.
+        current = st.session_state.get(key)
+        if not isinstance(current, list):
+            st.session_state[key] = [] if current in (None, "All") else [current]
 
 
 def _set(key: str, value: str) -> None:
@@ -107,7 +117,7 @@ def render(
             f'{hidden_drive_level} drive-level correction'
             f'{"s" if hidden_drive_level != 1 else ""} '
             f'(Drive Result / Furthest Advance) hidden by the '
-            f'{st.session_state.corr_play_filter} filter — set Play back to All to see '
+            f'{" + ".join(st.session_state.corr_play_filter)} filter — clear Play to see '
             f'{"them" if hidden_drive_level != 1 else "it"}.'
             f'</div>',
             unsafe_allow_html=True,
@@ -159,40 +169,39 @@ def _render_filter_row(
                 args=("corr_impact_filter", label),
             )
 
-    # Team / Type / Play / Market — selectboxes.
-    team_options = [_ANY] + [a for a in (away_abbrev, home_abbrev) if a]
+    # Team / Type / Play — multiselects, each accepting several values at once.
+    # The Market dropdown was removed: it only ever populated from markets present
+    # in the log, so it was empty on a quiet game, and Impact + Type cover the
+    # same ground (e.g. Type: Play Yards + Market Impacted).
+    team_options = [a for a in (away_abbrev, home_abbrev) if a]
 
-    # Market options are built FROM the corrections present, not from a hardcoded
-    # market list: Sack This Drive, Punt Fair Catch and 4th Down Conversion can
-    # never produce a correction, so a static list would show dead options that
-    # always return nothing.
-    markets_present = sorted({m for c in corrections for m in c.markets_impacted})
-    market_options = [_ANY] + markets_present
-
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
     with c1:
-        _selectbox("Team", "corr_team_filter", team_options)
+        _multiselect("Team", "corr_team_filter", team_options)
     with c2:
-        _selectbox("Type", "corr_field_filter", [_ANY] + _FIELD_FILTERS)
+        _multiselect("Type", "corr_field_filter", _FIELD_FILTERS)
     with c3:
-        _selectbox("Play", "corr_play_filter", [_ANY] + _PLAY_CLASS_FILTERS)
-    with c4:
-        _selectbox("Market", "corr_market_filter", market_options)
+        _multiselect("Play", "corr_play_filter", _PLAY_CLASS_FILTERS)
 
 
-def _selectbox(prefix: str, state_key: str, options: list[str]) -> None:
+def _multiselect(prefix: str, state_key: str, options: list[str]) -> None:
     """
-    Selectbox bound to session state. Guards against a stored value that is no
-    longer in options (e.g. a Market filter set on a market that has since been
-    cleared by reset_game_state) by falling back to All instead of raising.
+    Multiselect bound to session state. Empty selection = no filter (show all).
+
+    Drops any stored value no longer in options rather than raising — e.g. a Team
+    filter still holding the previous game's abbreviation. Streamlit raises on a
+    default/value that isn't in options, so this guard is load-bearing, not
+    defensive padding.
     """
-    if st.session_state[state_key] not in options:
-        st.session_state[state_key] = _ANY
-    st.selectbox(
+    stored = st.session_state.get(state_key) or []
+    valid = [v for v in stored if v in options]
+    if valid != stored:
+        st.session_state[state_key] = valid
+    st.multiselect(
         prefix,
         options=options,
-        format_func=lambda v: f"{prefix}: {v}",
         key=state_key,
+        placeholder=f"{prefix}: All",
         label_visibility="collapsed",
     )
 
@@ -217,10 +226,11 @@ def _apply_filters(
     ignore_play_filter: bool = False,
 ) -> list[StatCorrection]:
     impact = st.session_state.corr_impact_filter
-    team   = st.session_state.corr_team_filter
-    field  = st.session_state.corr_field_filter
-    play   = st.session_state.corr_play_filter
-    market = st.session_state.corr_market_filter
+    # Empty list = no filter on that axis. Values within one filter are OR'd
+    # (Rush OR Pass); the filters are AND'd with each other.
+    teams  = st.session_state.corr_team_filter or []
+    fields = st.session_state.corr_field_filter or []
+    plays  = st.session_state.corr_play_filter or []
 
     out = []
     for c in corrections:
@@ -230,15 +240,15 @@ def _apply_filters(
             continue
         # getattr keeps old corrections from a pre-upgrade session log renderable
         # instead of crashing on a missing attribute.
-        if team != _ANY and getattr(c, "team_abbrev", "") != team:
+        if teams and getattr(c, "team_abbrev", "") not in teams:
             continue
-        if field != _ANY and c.field != field:
+        if fields and c.field not in fields:
             continue
-        if not ignore_play_filter and play != _ANY \
-                and play not in getattr(c, "play_classes", []):
-            continue
-        if market != _ANY and market not in c.markets_impacted:
-            continue
+        # Play: keep the card if it matches ANY selected class.
+        if not ignore_play_filter and plays:
+            classes = getattr(c, "play_classes", [])
+            if not any(p in classes for p in plays):
+                continue
         out.append(c)
     return out
 
@@ -246,10 +256,10 @@ def _apply_filters(
 def _hidden_drive_level_count(corrections: list[StatCorrection]) -> int:
     """
     How many drive-level cards the active Rush/Pass filter is hiding — counted
-    against the OTHER filters, so a card already excluded by Team or Market is
-    not blamed on the Play filter and double-reported.
+    against the OTHER filters, so a card already excluded by Team or Type is not
+    blamed on the Play filter and double-reported.
     """
-    if st.session_state.corr_play_filter == _ANY:
+    if not st.session_state.corr_play_filter:
         return 0
     return sum(
         1 for c in _apply_filters(corrections, ignore_play_filter=True)

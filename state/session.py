@@ -11,7 +11,10 @@ from models.game import League
 # 3: dropped the dead "selected_tab" key (left over from the removed Markets tab)
 #    and added "active_tab", which drives the tab strip in app.py.
 # 4: added the five corr_*_filter keys for the Corrections tab filter row.
-STATE_VERSION = 4
+# 5: Team/Type/Play filters became multiselects — their values are now LISTS, not
+#    strings, and corr_market_filter was removed. The shape change is why this
+#    bump matters: a session holding "All" would break list membership tests.
+STATE_VERSION = 5
 
 _DEFAULTS: dict = {
     # League selection
@@ -58,11 +61,14 @@ _DEFAULTS: dict = {
     # Corrections tab filters. Persist across refresh cycles (so a filter set
     # mid-game holds) but ARE cleared by reset_game_state — a filter left over
     # from the previous game would silently hide the new game's corrections.
+    # Impact is single-select (its options are mutually exclusive). Team/Type/Play
+    # are multiselect LISTS where empty = no filter, so the defaults must be []
+    # and NOT "All" — a string default would break the list logic in the page.
+    # Mutable defaults are copied on assignment below.
     "corr_impact_filter":       "All",     # All | Market Impacted | No Impact
-    "corr_team_filter":         "All",     # All | away abbrev | home abbrev
-    "corr_field_filter":        "All",     # All | StatCorrection.field value
-    "corr_play_filter":         "All",     # All | Rush | Pass
-    "corr_market_filter":       "All",     # All | market name
+    "corr_team_filter":         [],        # [] = all | [away abbrev, home abbrev]
+    "corr_field_filter":        [],        # [] = all | StatCorrection.field values
+    "corr_play_filter":         [],        # [] = all | Rush and/or Pass
 
     "refresh_interval_ms":      5000,
     "show_nfl_only_markets":    True,
@@ -70,15 +76,30 @@ _DEFAULTS: dict = {
 }
 
 
+def _default(key: str):
+    """
+    A FRESH copy of a default value. Several defaults are mutable ([] and {}), and
+    assigning them directly would alias the single object inside _DEFAULTS — so
+    anything mutating session state in place (a multiselect's list, a dict of
+    system results) would corrupt the default for every later reset.
+    """
+    value = _DEFAULTS[key]
+    if isinstance(value, list):
+        return list(value)
+    if isinstance(value, dict):
+        return dict(value)
+    return value
+
+
 def init_state() -> None:
     if st.session_state.get("_state_version") != STATE_VERSION:
-        for key, value in _DEFAULTS.items():
-            st.session_state[key] = value
+        for key in _DEFAULTS:
+            st.session_state[key] = _default(key)
         st.session_state["_state_version"] = STATE_VERSION
     else:
-        for key, value in _DEFAULTS.items():
+        for key in _DEFAULTS:
             if key not in st.session_state:
-                st.session_state[key] = value
+                st.session_state[key] = _default(key)
 
 
 def reset_game_state() -> None:
@@ -88,13 +109,13 @@ def reset_game_state() -> None:
         "system_results", "drive_snapshots", "stat_corrections",
         "alert_log", "warning_message", "warning_type", "alert_shown_until",
         "rate_limit_skip_remaining",
-        # Corrections filters: a stale team abbrev or market from the previous
-        # game would hide everything in the new one.
+        # Corrections filters: a stale team abbrev from the previous game would
+        # hide everything in the new one.
         "corr_impact_filter", "corr_team_filter", "corr_field_filter",
-        "corr_play_filter", "corr_market_filter",
+        "corr_play_filter",
     ]
     for key in game_keys:
-        st.session_state[key] = _DEFAULTS[key]
+        st.session_state[key] = _default(key)
 
 
 def set_system_result(drive_id: str, market: str, value: str) -> None:
