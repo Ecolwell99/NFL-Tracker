@@ -261,17 +261,77 @@ _render_scoreboard(game)
 warning_box(st.session_state.warning_message, st.session_state.warning_type)
 
 # ── Tab navigation ───────────────────────────────────────────────────
+# NOT st.tabs(). st.tabs keeps the active tab in the frontend only, so the
+# autorefresh rerun every few seconds rebuilds the strip and it defaults back to
+# the first tab — sitting on Corrections kicked you to Drives after 5-10s. Worse,
+# the Corrections label carries a live count, and a changed label remounts the
+# whole strip, so the bounce fired exactly when a correction landed.
+#
+# A keyed radio stores the selection in session state, so it survives reruns.
+# The options MUST stay static and the count MUST live only in format_func:
+# if the count were in the option values, the stored value "Corrections 🔴 (3)"
+# would cease to exist the moment the count hit 4 and the selection would snap
+# back to Drives — the same bug in new clothes.
 correction_total = len(st.session_state.stat_corrections)
 
-tab_labels = [
-    "Drives",
-    "Play-by-Play",
-    f"Corrections {'🔴' if correction_total else '✅'} ({correction_total})",
-]
+_TAB_DRIVES      = "drives"
+_TAB_PBP         = "pbp"
+_TAB_CORRECTIONS = "corrections"
 
-tabs = st.tabs(tab_labels)
 
-with tabs[0]:
+def _tab_label(key: str) -> str:
+    if key == _TAB_DRIVES:
+        return "Drives"
+    if key == _TAB_PBP:
+        return "Play-by-Play"
+    return f"Corrections {'🔴' if correction_total else '✅'} ({correction_total})"
+
+
+# Cosmetic only — makes the radio read as a tab strip. Scoped to this widget via
+# the .st-key-active_tab wrapper class Streamlit adds for any keyed widget, so it
+# can't leak onto the sidebar's League radio. If Streamlit changes these internal
+# selectors nothing breaks: it degrades to a plain horizontal radio, which still
+# navigates correctly.
+st.markdown("""
+<style>
+.st-key-active_tab div[role="radiogroup"] { gap: 4px; }
+.st-key-active_tab div[role="radiogroup"] > label {
+    padding: 6px 16px;
+    border-radius: 8px 8px 0 0;
+    font-weight: 700;
+    font-size: 15px;
+    border-bottom: 2px solid transparent;
+}
+.st-key-active_tab div[role="radiogroup"] > label:hover {
+    background: var(--secondary-background-color);
+}
+.st-key-active_tab div[role="radiogroup"] > label:has(input:checked) {
+    background: var(--secondary-background-color);
+    border-bottom: 2px solid #ff4b4b;
+}
+/* Hide the radio dot so it reads as a tab, not a form control. The :has(input)
+   guard matters: without it, a future Streamlit DOM change could match the div
+   holding the tab TEXT and hide the labels entirely. */
+.st-key-active_tab div[role="radiogroup"] > label > div:first-child:has(input) {
+    display: none;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# No index= here: with a key set, session state is the source of truth for the
+# selection, which is the whole point.
+st.radio(
+    "View",
+    options=[_TAB_DRIVES, _TAB_PBP, _TAB_CORRECTIONS],
+    format_func=_tab_label,
+    horizontal=True,
+    key="active_tab",
+    label_visibility="collapsed",
+)
+
+active = st.session_state.active_tab
+
+if active == _TAB_DRIVES:
     pg_drives.render(
         drives, evaluated, drive_qcs,
         game_home_abbrev=game.home_team.abbreviation,
@@ -281,7 +341,7 @@ with tabs[0]:
         use_curated_colors=(league == League.NFL),
     )
 
-with tabs[1]:
+elif active == _TAB_PBP:
     pg_pbp.render(
         drives,
         game_home_abbrev=game.home_team.abbreviation,
@@ -291,7 +351,7 @@ with tabs[1]:
         use_curated_colors=(league == League.NFL),
     )
 
-with tabs[2]:
+else:
     pg_corrections.render(
         st.session_state.stat_corrections,
         color_mode=st.session_state.color_mode,

@@ -8,7 +8,9 @@ from __future__ import annotations
 import streamlit as st
 from models.game import League
 
-STATE_VERSION = 2
+# 3: dropped the dead "selected_tab" key (left over from the removed Markets tab)
+#    and added "active_tab", which drives the tab strip in app.py.
+STATE_VERSION = 3
 
 _DEFAULTS: dict = {
     # League selection
@@ -45,7 +47,12 @@ _DEFAULTS: dict = {
     # UI preferences
     "filter_recent":            False,
     "color_mode":               True,
-    "selected_tab":             "Markets",
+    # Which tab is showing. Held in session state (not by st.tabs, which keeps it
+    # frontend-side only) so the autorefresh rerun can't bounce you back to
+    # Drives. Values are the stable keys in app.py: "drives" | "pbp" |
+    # "corrections". Deliberately NOT reset by reset_game_state — switching game
+    # or league should leave you on the tab you were working in.
+    "active_tab":               "drives",
     "refresh_interval_ms":      5000,
     "show_nfl_only_markets":    True,
     "show_void_drives":         True,
