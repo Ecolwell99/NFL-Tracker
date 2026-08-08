@@ -11,7 +11,10 @@ from services.cache import cached_get_games, cached_get_drives, cached_get_game,
 from models.game import League, GameStatus
 from rules.engine import evaluate_all_drives
 from qc.comparator import compare_all_drives
-from qc.corrections import snapshot_all_drives, diff_drives, build_drive_label_map, merge_corrections
+from qc.corrections import (
+    snapshot_all_drives, diff_drives, build_drive_label_map,
+    build_drive_team_map, merge_corrections,
+)
 from components.warning_box import warning_box
 from utils.time import period_label
 from utils.colors import resolve_team_colors, pill_text_color, team_fallback_colors
@@ -217,11 +220,13 @@ try:
     prev_snaps  = st.session_state.drive_snapshots
     curr_snaps  = snapshot_all_drives(drives)
     label_map   = build_drive_label_map(drives)
+    team_map    = build_drive_team_map(drives)
 
     if prev_snaps:
         new_corrections = diff_drives(
             prev_snaps, curr_snaps, label_map, detected_at,
             is_nfl=(league == League.NFL),
+            drive_teams=team_map,
         )
         if new_corrections:
             st.session_state.stat_corrections = merge_corrections(
@@ -355,4 +360,6 @@ else:
     pg_corrections.render(
         st.session_state.stat_corrections,
         color_mode=st.session_state.color_mode,
+        game_home_abbrev=game.home_team.abbreviation,
+        game_away_abbrev=game.away_team.abbreviation,
     )

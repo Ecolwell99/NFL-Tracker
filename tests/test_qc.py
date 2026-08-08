@@ -14,7 +14,8 @@ from qc.status import QCStatus
 from qc.comparator import compare_drive, compare_all_drives, get_all_mismatches, QCResult
 from qc.corrections import (
     snapshot_drive, snapshot_all_drives, diff_drives,
-    build_drive_label_map, merge_corrections, StatCorrection,
+    build_drive_label_map, build_drive_team_map, merge_corrections, StatCorrection,
+    _play_class, _play_classes_for, PLAY_CLASS_RUSH, PLAY_CLASS_PASS,
 )
 
 # ------------------------------------------------------------------ #
@@ -271,6 +272,103 @@ def test_new_drive_does_not_trigger_correction():
     corrections = diff_drives(prev, curr, {"d1": "TB Drive 1", "d2": "TB Drive 2"}, "12:05:00")
     # d2 should not generate corrections (it's new data, not a change)
     assert all(c.drive_id != "d2" for c in corrections)
+
+
+# ------------------------------------------------------------------ #
+# Corrections tab filter support: play class + team
+# ------------------------------------------------------------------ #
+
+def test_play_class_buckets():
+    assert _play_class("Rush") == PLAY_CLASS_RUSH
+    assert _play_class("Rushing Touchdown") == PLAY_CLASS_RUSH
+    assert _play_class("Pass Reception") == PLAY_CLASS_PASS
+    assert _play_class("Pass Incompletion") == PLAY_CLASS_PASS
+    assert _play_class("Passing Touchdown") == PLAY_CLASS_PASS
+    assert _play_class("Pass Interception Return") == PLAY_CLASS_PASS
+    # Neither bucket — special teams / admin plays
+    assert _play_class("Punt") is None
+    assert _play_class("Penalty") is None
+    assert _play_class("Fumble") is None
+
+
+def test_sack_classified_as_pass():
+    """
+    Deliberate divergence from Play.is_pass, which excludes SACK. A trader
+    filtering to Pass expects sack yardage revisions. Do not "reconcile" these.
+    """
+    assert _play_class("Sack") == PLAY_CLASS_PASS
+    assert Play(
+        play_id="x", sequence=1, play_type=PlayType.SACK, yards=-7,
+        down=3, distance=10, yard_line=60, end_yard_line=67, description="",
+    ).is_pass is False
+
+
+def test_play_classes_for_matches_both_sides_of_type_change():
+    """A rush reclassified to a fumble must still match a Rush filter."""
+    classes = _play_classes_for("Rush", "Fumble")
+    assert PLAY_CLASS_RUSH in classes
+    # Order is stable: Rush before Pass
+    assert _play_classes_for("Pass Reception", "Rush") == [PLAY_CLASS_RUSH, PLAY_CLASS_PASS]
+    # Neither side classifiable
+    assert _play_classes_for("Punt", "Punt Return") == []
+
+
+def test_play_correction_carries_play_class_and_team():
+    drive = _punt_drive()
+    prev = snapshot_all_drives([drive])
+    drive.plays[0].yards = 8          # rush 3 -> 8
+    curr = snapshot_all_drives([drive])
+
+    corrections = diff_drives(
+        prev, curr, {"d2": "TB Drive 2"}, "12:06:00",
+        drive_teams=build_drive_team_map([drive]),
+    )
+    yards = [c for c in corrections if c.field == "Play Yards"]
+    assert len(yards) >= 1
+    assert yards[0].team_abbrev == "TB"
+    assert PLAY_CLASS_RUSH in yards[0].play_classes
+
+
+def test_drive_level_correction_has_no_play_class():
+    """Drive Result carries no play class, so a Rush/Pass filter hides it."""
+    drive = _td_drive()
+    prev = snapshot_all_drives([drive])
+    drive.espn_result = "PUNT"
+    curr = snapshot_all_drives([drive])
+
+    corrections = diff_drives(
+        prev, curr, {"d1": "TB Drive 1"}, "12:07:00",
+        drive_teams=build_drive_team_map([drive]),
+    )
+    result = [c for c in corrections if c.field == "Drive Result"]
+    assert result and result[0].play_classes == []
+    assert result[0].team_abbrev == "TB"
+
+
+def test_removed_play_carries_its_own_class():
+    drive = _td_drive()
+    prev = snapshot_all_drives([drive])
+    drive.plays.pop(0)                # removes the opening RUSH
+    curr = snapshot_all_drives([drive])
+
+    corrections = diff_drives(
+        prev, curr, {"d1": "TB Drive 1"}, "12:08:00",
+        drive_teams=build_drive_team_map([drive]),
+    )
+    removed = [c for c in corrections if c.field == "Play Removed"]
+    assert len(removed) == 1
+    assert PLAY_CLASS_RUSH in removed[0].play_classes
+
+
+def test_diff_drives_without_team_map_still_works():
+    """drive_teams is optional — omitting it must not raise."""
+    drive = _td_drive()
+    prev = snapshot_all_drives([drive])
+    drive.espn_result = "PUNT"
+    curr = snapshot_all_drives([drive])
+
+    corrections = diff_drives(prev, curr, {"d1": "TB Drive 1"}, "12:09:00")
+    assert corrections and corrections[0].team_abbrev == ""
 
 
 def test_merge_corrections_caps_at_max():

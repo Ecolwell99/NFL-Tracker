@@ -10,7 +10,8 @@ from models.game import League
 
 # 3: dropped the dead "selected_tab" key (left over from the removed Markets tab)
 #    and added "active_tab", which drives the tab strip in app.py.
-STATE_VERSION = 3
+# 4: added the five corr_*_filter keys for the Corrections tab filter row.
+STATE_VERSION = 4
 
 _DEFAULTS: dict = {
     # League selection
@@ -53,6 +54,16 @@ _DEFAULTS: dict = {
     # "corrections". Deliberately NOT reset by reset_game_state — switching game
     # or league should leave you on the tab you were working in.
     "active_tab":               "drives",
+
+    # Corrections tab filters. Persist across refresh cycles (so a filter set
+    # mid-game holds) but ARE cleared by reset_game_state — a filter left over
+    # from the previous game would silently hide the new game's corrections.
+    "corr_impact_filter":       "All",     # All | Market-Moving | No Impact
+    "corr_team_filter":         "All",     # All | away abbrev | home abbrev
+    "corr_field_filter":        "All",     # All | StatCorrection.field value
+    "corr_play_filter":         "All",     # All | Rush | Pass
+    "corr_market_filter":       "All",     # All | market name
+
     "refresh_interval_ms":      5000,
     "show_nfl_only_markets":    True,
     "show_void_drives":         True,
@@ -77,6 +88,10 @@ def reset_game_state() -> None:
         "system_results", "drive_snapshots", "stat_corrections",
         "alert_log", "warning_message", "warning_type", "alert_shown_until",
         "rate_limit_skip_remaining",
+        # Corrections filters: a stale team abbrev or market from the previous
+        # game would hide everything in the new one.
+        "corr_impact_filter", "corr_team_filter", "corr_field_filter",
+        "corr_play_filter", "corr_market_filter",
     ]
     for key in game_keys:
         st.session_state[key] = _DEFAULTS[key]

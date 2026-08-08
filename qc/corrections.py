@@ -34,6 +34,20 @@ class StatCorrection:
     markets_impacted: list[str] = field(default_factory=list)
     play_description: str = ""  # for play-level corrections
 
+    # ── Filtering support (Corrections tab) ──────────────────────────
+    # Team that owned the drive, e.g. "CAR". Carried explicitly rather than
+    # regexed out of drive_label at render time.
+    team_abbrev: str = ""
+    # Play type string for play-level corrections, "" for drive-level ones.
+    # Display/debug only — filtering uses play_classes.
+    play_type: str = ""
+    # Which play classes ("Rush" / "Pass") this correction touches, computed at
+    # diff time so the UI never has to re-derive play semantics. A type change
+    # lists BOTH sides: "Rush -> Fumble" yields ["Rush"] so a rush play being
+    # reclassified still appears under a Rush filter — that is precisely the card
+    # you most want to see. Empty for drive-level corrections.
+    play_classes: list[str] = field(default_factory=list)
+
 
 # ------------------------------------------------------------------ #
 # Snapshot builders
@@ -182,6 +196,48 @@ _ST_RETURN_TYPES = (
 )
 
 
+# ── Play classification for the Corrections tab filter ──────────────
+# String-keyed on purpose: snapshots store play_type.value (a plain str) so they
+# survive pickling through st.cache_data. Do NOT route this through
+# Play.is_rush / Play.is_pass — those take a PlayType enum, not a string.
+#
+# DELIBERATE DIVERGENCE from Play.is_pass (models/play.py): SACK is classified
+# here as a Pass. A sack is a dropback, so a trader filtering to Pass expects to
+# see sack yardage revisions. Play.is_pass excludes SACK because it feeds yardage
+# and market logic where a sack is not a pass attempt. Both are correct for their
+# own purpose — this is not an oversight, and the two must not be "reconciled".
+PLAY_CLASS_RUSH = "Rush"
+PLAY_CLASS_PASS = "Pass"
+
+_RUSH_TYPES = frozenset({"Rush", "Rushing Touchdown"})
+_PASS_TYPES = frozenset({
+    "Pass Reception",
+    "Pass Incompletion",
+    "Passing Touchdown",
+    "Pass Interception Return",
+    "Sack",                      # see divergence note above
+})
+
+
+def _play_class(play_type: str) -> str | None:
+    """Rush / Pass bucket for a play type string, or None if it is neither."""
+    if play_type in _RUSH_TYPES:
+        return PLAY_CLASS_RUSH
+    if play_type in _PASS_TYPES:
+        return PLAY_CLASS_PASS
+    return None
+
+
+def _play_classes_for(*play_types: str) -> list[str]:
+    """
+    Classes touched by a correction. Pass every relevant type (both sides of a
+    type change) so a reclassified play still matches its original class.
+    Order-stable: Rush before Pass.
+    """
+    found = {c for pt in play_types if (c := _play_class(pt)) is not None}
+    return [c for c in (PLAY_CLASS_RUSH, PLAY_CLASS_PASS) if c in found]
+
+
 def _explosive_markets_satisfied(play_type: str, yards: int) -> set[str]:
     """
     Which explosive-play markets a single play would settle Yes on, given its
@@ -264,6 +320,7 @@ def diff_drives(
     drive_labels: dict[str, str],
     detected_at: str,
     is_nfl: bool = True,
+    drive_teams: dict[str, str] | None = None,
 ) -> list[StatCorrection]:
     """
     Compare previous snapshot against current snapshot.
@@ -276,11 +333,17 @@ def diff_drives(
         detected_at:  timestamp string e.g. "12:34:05 PM ET"
         is_nfl:       gates NFL-only micro-market thresholds
                       (Rusher Over 3.5 Yards, Next Catch Over 9.5 Yards)
+        drive_teams:  drive_id → team abbreviation, for the Corrections tab team
+                      filter. Optional so existing callers/tests keep working;
+                      when omitted, team_abbrev is "" and the team filter simply
+                      has nothing to match on.
     """
     corrections: list[StatCorrection] = []
+    teams = drive_teams or {}
 
     for drive_id, curr_snap in current.items():
         label = drive_labels.get(drive_id, drive_id)
+        team = teams.get(drive_id, "")
 
         if drive_id not in previous:
             # New drive appeared — not a correction, just new data
@@ -305,6 +368,8 @@ def diff_drives(
                     previous_value=prev_val,
                     new_value=curr_val,
                     markets_impacted=_markets_impacted_by_drive_change(field),
+                    team_abbrev=team,
+                    # Drive-level: no play class. Hidden by a Rush/Pass filter.
                 ))
 
         # ── Play-level fields ─────────────────────────────────────────
@@ -338,6 +403,10 @@ def diff_drives(
                         previous_value=str(prev_min),
                         new_value=str(curr_min),
                         markets_impacted=crossed,
+                        team_abbrev=team,
+                        # Drive-level: derived from the whole shared play set, so
+                        # no single play class applies. Hidden by a Rush/Pass
+                        # filter — the tab warns when that happens.
                     ))
 
         # Removed plays
@@ -353,6 +422,11 @@ def diff_drives(
                     new_value="(removed)",
                     markets_impacted=_DRIVE_RESULT_MARKETS + _YARDLINE_MARKETS + _EXPLOSIVE_PLAY_MARKETS,
                     play_description=p.get("description", "")[:100],
+                    team_abbrev=team,
+                    # Class comes from the removed play's own type (there is no
+                    # "current" side), so a deleted rush still matches Rush.
+                    play_type=str(p.get("type", "")),
+                    play_classes=_play_classes_for(str(p.get("type", ""))),
                 ))
 
         # Changed plays
@@ -389,6 +463,17 @@ def diff_drives(
                         field, curr_play, prev_play, is_nfl
                     ),
                     play_description=curr_play.get("description", "")[:100],
+                    team_abbrev=team,
+                    play_type=str(curr_play.get("type", "")),
+                    # BOTH sides: on a "Rush -> Fumble" type change the new type
+                    # is neither class, so passing only the current type would
+                    # drop the card from a Rush filter — exactly the card a
+                    # trader is looking for. Non-type changes pass the same value
+                    # twice, which the set collapses.
+                    play_classes=_play_classes_for(
+                        str(prev_play.get("type", "")),
+                        str(curr_play.get("type", "")),
+                    ),
                 ))
 
     return corrections
@@ -423,6 +508,11 @@ def _play_field_display_name(field: str) -> str:
 
 def build_drive_label_map(drives: list[Drive]) -> dict[str, str]:
     return {d.drive_id: d.label for d in drives}
+
+
+def build_drive_team_map(drives: list[Drive]) -> dict[str, str]:
+    """drive_id → team abbreviation, for the Corrections tab team filter."""
+    return {d.drive_id: d.team.abbreviation for d in drives}
 
 
 def merge_corrections(
