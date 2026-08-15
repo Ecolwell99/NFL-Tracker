@@ -50,6 +50,10 @@ def render(
 
     rows = []
     for drive in drives:
+        # Filter first — no point building a pill for a drive we then skip.
+        if "All" not in team_filter and drive.team.abbreviation not in team_filter:
+            continue
+
         team_color = color_map.get(drive.team.abbreviation, "#555")
         fg = pill_text_color(team_color)
         team_pill = (
@@ -58,26 +62,29 @@ def render(
             f'{drive.team.abbreviation}</span>'
         )
 
-        if "All" not in team_filter and drive.team.abbreviation not in team_filter:
-            continue
+        # One column instead of two: drive.label is the full team name
+        # ("Chicago Bears Drive 1"), which just repeated the Team column's
+        # abbreviation and ate width the description needs.
+        drive_cell = f"{team_pill} Drive {drive.team_drive_number}"
 
         for play in drive.plays:
             if "All" not in type_filter and play.play_type.value not in type_filter:
                 continue
             rows.append({
-                "Drive":    drive.label,
-                "Team":     drive.team.abbreviation,
+                "Drive":    drive_cell,
                 "Down":     f"{play.down} & {play.distance}" if play.down > 0 else "—",
                 "Type":     play.play_type.value,
                 "Yards":    str(play.yards),
                 "Scoring":  "Yes" if play.is_scoring else "No",
-                "Description": play.description[:90] + ("…" if len(play.description) > 90 else ""),
+                # Never truncate — traders have to read the whole description,
+                # penalty text especially. The Description column wraps instead.
+                "Description": play.description,
             })
 
     if filter_recent:
         rows = list(reversed(rows))
 
     if rows:
-        render_table(rows, color_mode=False)
+        render_table(rows, color_mode=False, wrap_columns={"Description"})
     else:
         st.info("No plays match the current filter.")

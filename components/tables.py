@@ -11,9 +11,22 @@ def html_table(
     rows: list[dict],
     color_mode: bool = True,
     team_color_map: dict[str, str] | None = None,
+    wrap_columns: set[str] | None = None,
 ) -> str:
+    """
+    Render rows as an HTML table.
+
+    wrap_columns: column names allowed to wrap onto multiple lines instead of
+    being held on one line. Cells default to `white-space:nowrap` so short
+    values (Down, Yards, market results) never break mid-value — but that also
+    means a long play description would force horizontal scrolling, so the
+    Description column opts in here. A wrapping column takes `width:100%` so it
+    absorbs the leftover table width and the nowrap columns keep their natural
+    size; `min-width` stops it collapsing to nothing on a narrow screen.
+    """
     if not rows:
         return ""
+    wrap_columns = wrap_columns or set()
     headers = list(rows[0].keys())
     th = "".join(
         f'<th style="padding:6px 14px; text-align:left; border-bottom:2px solid '
@@ -29,9 +42,15 @@ def html_table(
         for h in headers:
             val = row[h]
             display = _render_cell(str(val), color_mode, team_color_map)
+            if h in wrap_columns:
+                sizing = ("white-space:normal; overflow-wrap:break-word; "
+                          "width:100%; min-width:200px; line-height:1.5;")
+            else:
+                sizing = "white-space:nowrap;"
             tds += (
-                f'<td style="padding:5px 14px; font-size:13px; white-space:nowrap; '
-                f'color:var(--text-color); font-weight:500;">{display}</td>'
+                f'<td style="padding:5px 14px; font-size:13px; {sizing} '
+                f'vertical-align:top; color:var(--text-color); '
+                f'font-weight:500;">{display}</td>'
             )
         body += f'<tr style="background-color:{bg};">{tds}</tr>'
     return (
@@ -84,9 +103,10 @@ def _pill(text: str, bg: str, fg: str) -> str:
 
 
 def render_table(rows: list[dict], color_mode: bool = True,
-                 team_color_map: dict[str, str] | None = None) -> None:
+                 team_color_map: dict[str, str] | None = None,
+                 wrap_columns: set[str] | None = None) -> None:
     """Render html_table directly into Streamlit."""
-    html = html_table(rows, color_mode, team_color_map)
+    html = html_table(rows, color_mode, team_color_map, wrap_columns)
     if html:
         st.markdown(html, unsafe_allow_html=True)
     else:

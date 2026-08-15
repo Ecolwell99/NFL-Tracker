@@ -241,9 +241,11 @@ def _render_play_log(drive: Drive, color_mode: bool) -> None:
             "Type":   play.play_type.value,
             "Yards":  str(play.yards),
             "Pos":    f"{'Opp' if play.yard_line <= 50 else 'Own'} {abs(50 - play.yard_line) + 50 if play.yard_line > 50 else play.yard_line}",
-            "Description": play.description[:80] + ("…" if len(play.description) > 80 else ""),
+            # Never truncate — traders have to read the whole description,
+            # penalty text especially. The Description column wraps instead.
+            "Description": play.description,
         })
-    render_table(rows, color_mode=False)
+    render_table(rows, color_mode=False, wrap_columns={"Description"})
 
 
 def _render_pass_catchers(drive: Drive) -> None:
