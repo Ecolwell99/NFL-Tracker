@@ -33,8 +33,14 @@ def render(
         st.info("No play data yet.")
         return
 
+    # Keyword args deliberately: resolve_team_colors takes HOME first, and passing
+    # these positionally in away/home order made the tab disagree with the
+    # scoreboard. Only the away team is swapped to its alternate when the two
+    # primaries are too close, so reversing the pair swapped the wrong team —
+    # CLE/CHI rendered CLE brown + CHI orange here vs CLE orange + CHI navy up top.
     color_map = resolve_team_colors(
-        game_away_abbrev, game_home_abbrev,
+        home_abbrev=game_home_abbrev,
+        away_abbrev=game_away_abbrev,
         fallback=team_fallback_colors(*{d.team.abbreviation: d.team for d in drives}.values()),
         use_curated=use_curated_colors,
     )

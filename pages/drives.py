@@ -36,8 +36,13 @@ def render(
 
     st.markdown(_EXPANDER_CSS, unsafe_allow_html=True)
 
+    # Keyword args deliberately — see the note in pages/play_by_play.py: this was
+    # passed positionally in away/home order, which is reversed, so close-coloured
+    # matchups swapped the wrong team to its alternate and disagreed with the
+    # scoreboard.
     color_map = resolve_team_colors(
-        game_away_abbrev, game_home_abbrev,
+        home_abbrev=game_home_abbrev,
+        away_abbrev=game_away_abbrev,
         fallback=team_fallback_colors(*{d.team.abbreviation: d.team for d in drives}.values()),
         use_curated=use_curated_colors,
     )
