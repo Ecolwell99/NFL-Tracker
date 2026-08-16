@@ -4,6 +4,22 @@ from models.drive import Drive
 from utils.colors import resolve_team_colors, pill_text_color, team_fallback_colors
 from components.tables import render_table
 
+# Fixed list — the play types traders filter on. Module level so the filter row
+# below stays readable.
+_PLAY_TYPE_FILTERS = [
+    "Fumble",
+    "Field Goal Good",
+    "Field Goal Missed",
+    "Pass Incompletion",
+    "Pass Interception Return",
+    "Pass Reception",
+    "Passing Touchdown",
+    "Penalty",
+    "Punt",
+    "Rush",
+    "Sack",
+]
+
 
 def render(
     drives: list[Drive],
@@ -23,30 +39,36 @@ def render(
         use_curated=use_curated_colors,
     )
 
-    # Filter controls
+    # ── Filter controls + sort ───────────────────────────────────────
+    # Sort button on the right of the same row, mirroring the Drives tab.
     all_teams = sorted({d.team.abbreviation for d in drives})
-    team_filter = st.multiselect(
-        "Filter by team", options=["All"] + all_teams, default=["All"],
-        label_visibility="collapsed",
-    )
+    col_team, col_type, col_sort = st.columns([3, 3, 1.5])
 
-    PLAY_TYPE_FILTERS = [
-        "Fumble",
-        "Field Goal Good",
-        "Field Goal Missed",
-        "Pass Incompletion",
-        "Pass Interception Return",
-        "Pass Reception",
-        "Passing Touchdown",
-        "Penalty",
-        "Punt",
-        "Rush",
-        "Sack",
-    ]
-    type_filter = st.multiselect(
-        "Filter by play type", options=["All"] + PLAY_TYPE_FILTERS, default=["All"],
-        label_visibility="collapsed",
-    )
+    with col_team:
+        team_filter = st.multiselect(
+            "Filter by team", options=["All"] + all_teams, default=["All"],
+            label_visibility="collapsed",
+        )
+    with col_type:
+        type_filter = st.multiselect(
+            "Filter by play type", options=["All"] + _PLAY_TYPE_FILTERS, default=["All"],
+            label_visibility="collapsed",
+        )
+    with col_sort:
+        # Label is the ACTION, matching the Drives tab: it reads "Newest First"
+        # while currently oldest-first. on_click (not an `if st.button()` body)
+        # so the state flips before the rerun — otherwise the order lags one
+        # click behind. The button's own label changes, so it carries a static
+        # key: a button holds no state of its own, but the key keeps its
+        # identity stable rather than being derived from the changing label.
+        st.button(
+            "↕ Newest First" if not filter_recent else "↕ Oldest First",
+            use_container_width=True,
+            key="pbp_sort_toggle",
+            on_click=lambda: st.session_state.update(
+                filter_recent=not st.session_state.filter_recent
+            ),
+        )
 
     rows = []
     for drive in drives:
@@ -81,6 +103,9 @@ def render(
                 "Description": play.description,
             })
 
+    # Newest first. Drives arrive in game order and plays are chronological within
+    # a drive, so reversing the flat row list reverses BOTH levels at once and
+    # gives strict reverse-chronological order — the latest play on top.
     if filter_recent:
         rows = list(reversed(rows))
 
